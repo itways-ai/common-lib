@@ -9,5 +9,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Import(SecurityModuleConfiguration.class)
+@EnableCache
 public @interface EnableCustomSecurity {
 }

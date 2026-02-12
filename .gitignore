@@ -11,3 +11,9 @@ build/
 
 # OS
 .DS_Store
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
