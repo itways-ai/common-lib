@@ -12,19 +12,19 @@ import java.util.UUID;
 @Component
 @Slf4j
 public class TransactionReferenceGenerator {
-    /**
-     * Generates a unique transaction reference with a custom prefix.
-     *
-     * @param customPrefix The prefix to use (e.g., "OAUTH", "OTP")
-     * @param length       The length of the random part
-     * @return A unique transaction reference string
-     */
-    public String generate(String customPrefix, Integer length) {
-        String uuid = UUID.randomUUID().toString().replace("-", "");
-        String randomPart = uuid.substring(0, Math.min(length, uuid.length()));
-        String transactionRef = customPrefix + randomPart.toUpperCase();
+        /**
+         * Generates a unique transaction reference with a custom prefix.
+         *
+         * @param customPrefix The prefix to use (e.g., "OAUTH", "OTP")
+         * @param length       The length of the random part
+         * @return A unique transaction reference string
+         */
+        public String generate(String customPrefix, Integer length) {
+                String uuid = UUID.randomUUID().toString().replace("-", "");
+                String randomPart = uuid.substring(0, Math.min(length, uuid.length()));
+                String transactionRef = customPrefix + randomPart.toUpperCase();
 
-        log.debug("Generated transaction reference: {}", transactionRef);
-        return transactionRef;
-    }
+                log.debug("Generated transaction reference: {}", transactionRef);
+                return transactionRef;
+        }
 }
