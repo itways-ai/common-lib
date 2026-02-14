@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(CacheProperties.class)
 @Slf4j
 @ComponentScan("com.itways.cache")
-public class ItWaysCacheAutoConfiguration {
+public class CacheAutoConfiguration {
     @PostConstruct
     public void print() {
         log.info("✅ Common-lib Cache configuration initialized");

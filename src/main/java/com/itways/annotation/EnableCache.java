@@ -1,6 +1,7 @@
 package com.itways.annotation;
 
-import com.itways.cache.config.ItWaysCacheAutoConfiguration;
+import com.itways.cache.config.CacheAutoConfiguration;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Import;
 
 import java.lang.annotation.*;
@@ -13,6 +14,7 @@ import java.lang.annotation.*;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Import(ItWaysCacheAutoConfiguration.class)
+@Import(CacheAutoConfiguration.class)
+@EnableCaching
 public @interface EnableCache {
 }

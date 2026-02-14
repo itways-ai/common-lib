@@ -38,12 +38,7 @@ public class InMemoryCacheStore<K, V> implements CacheStore<K, V> {
 
     @Override
     public void put(K key, V value) {
-        put(key, value, config.getTtlMinutes() * 60L);
-    }
-
-    @Override
-    public void put(K key, V value, long ttlSeconds) {
-        store.put(key, new CacheEntry<>(value, ttlSeconds));
+        store.put(key, new CacheEntry<>(value, config.getTtlMinutes() * 60L));
     }
 
     @Override

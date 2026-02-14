@@ -8,6 +8,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+
 @Configuration
 public class CacheProviderConfig {
     @Bean
@@ -22,5 +25,11 @@ public class CacheProviderConfig {
     @ConditionalOnMissingBean
     public CacheStoreFactory inMemoryCacheStoreFactory() {
         return new InMemoryCacheStoreFactory();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public CacheManager cacheManager() {
+        return new ConcurrentMapCacheManager();
     }
 }
