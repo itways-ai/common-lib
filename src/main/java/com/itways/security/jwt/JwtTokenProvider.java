@@ -63,15 +63,17 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(String username, String role) {
+        // NOTE: username here is expected to be the email if we are standardizing on
+        // email
         return generateAccessToken(username, Map.of("role", role));
     }
 
-    public String generateAccessToken(String username, Map<String, Object> extraClaims) {
+    public String generateAccessToken(String email, Map<String, Object> extraClaims) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessExpiration);
 
         return Jwts.builder()
-                .subject(username)
+                .subject(email)
                 .claims(extraClaims)
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -79,12 +81,12 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String generateRefreshToken(String username) {
+    public String generateRefreshToken(String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshExpiration);
 
         return Jwts.builder()
-                .subject(username)
+                .subject(email)
                 .claim("type", "REFRESH")
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -93,6 +95,7 @@ public class JwtTokenProvider {
     }
 
     public String getUsernameFromToken(String token) {
+        // Returns the Subject, which is now EMAIL
         return Jwts.parser()
                 .verifyWith(publicKey)
                 .build()

@@ -10,12 +10,6 @@ public interface CacheStore<K, V> {
     void put(K key, V value);
 
     /**
-     * Store a value in the cache with specific TTL.
-     * Note: Not all providers support per-entry TTL efficiently.
-     */
-    void put(K key, V value, long ttlSeconds);
-
-    /**
      * Retrieve a value from the cache
      */
     Optional<V> get(K key);
