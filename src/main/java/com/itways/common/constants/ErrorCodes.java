@@ -17,6 +17,8 @@ public class ErrorCodes {
     public static final String FORBIDDEN = "AUTH_403";
     public static final String ACCOUNT_LOCKED = "AUTH_008";
     public static final String CAPTCHA_INVALID = "AUTH_009";
+    public static final String EXTERNAL_SERVICE_ERROR = "SYS_002";
+    public static final String BAD_REQUEST = "REQ_001";
 
     private ErrorCodes() {
         // Utility class

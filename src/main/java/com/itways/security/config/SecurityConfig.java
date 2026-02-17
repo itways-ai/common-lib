@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 @ComponentScan("com.itways.security")
-public class SecurityModuleConfiguration {
+public class SecurityConfig {
 	
 	@PostConstruct
 	public void print() {

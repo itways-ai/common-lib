@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.itways.security.JwtTokenProvider;
+import com.itways.security.jwt.JwtTokenProvider;
 import com.itways.security.SecurityUtils;
 
 import jakarta.servlet.FilterChain;

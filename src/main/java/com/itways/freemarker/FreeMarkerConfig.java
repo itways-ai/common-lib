@@ -11,7 +11,7 @@ import freemarker.template.TemplateExceptionHandler;
 
 @Configuration
 @ComponentScan("com.itways.freemarker")
-public class FreeMarkerAutoConfiguration {
+public class FreeMarkerConfig {
 
 	@Primary
 	@Bean

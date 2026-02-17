@@ -1,101 +1,197 @@
-# Common Library
+# Common Library (common-lib)
 
-The Common Library is the specialized core shared across the AI Assistant platform. It provides a foundational set of utilities, security protocols, messaging patterns, and standardized response models to ensure consistency and accelerate microservice development.
+## 📌 Overview
 
-## 🚀 Key Features
+The **Common Library** serves as the foundational core for the AI Assistant platform's microservices architecture. It provides a standardized set of reusable utilities, security protocols, caching mechanisms, messaging patterns, and configuration management to ensure consistency, accelerate development, and enforce best practices across all services.
 
-- **Advanced Security**: 
-  - Centralized JWT generation and validation via `JwtTokenProvider`.
-  - Secure OTP (One-Time Password) management and lifecycle.
-  - Reusable security filters and principal resolvers.
-- **Messaging & Notifications**:
-  - Abstractions for RabbitMQ integration (`EnableNotificationMessaging`).
-  - Standardized DTOs for platform-wide events.
-- **Robust Error Handling**:
-  - Global `@ControllerAdvice` for consistent API error responses.
-  - Specialized exception hierarchy (e.g., `PlatformException`, `AuthException`).
-- **Dynamic Templating**: 
-  - Integrated FreeMarker support for email and document generation.
-- **Standardized API Contracts**: 
-  - Unified `ApiResponse<T>` wrapper for all REST endpoints.
-  - Shared pagination and sorting DTOs.
+This library encapsulates cross-cutting concerns such as:
+- **Authentication & Authorization** (JWT, RSA Encryption)
+- **Caching Abstractions** (Ehcache, InMemory)
+- **Inter-service Communication** (RabbitMQ Messaging)
+- **API Standards** (Unified Response, Pagination, Error Handling)
+- **Utility Services** (Encryption, Date/Time, Templating)
 
-## 🛠 Installation
+---
 
-Add the library as a dependency in your microservice's `pom.xml`:
+## 🚀 Installation
+
+To use `common-lib` in your Spring Boot application, add the following dependency to your `pom.xml`:
 
 ```xml
 <dependency>
     <groupId>com.itways</groupId>
     <artifactId>common-lib</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
-## ⚙️ Configuration
+---
 
-The library uses a modular "Enable" pattern. You can pick and choose the features to activate in your Spring Boot application:
+## ⚙️ Configuration & Features
+
+The library uses a modular **"Enable"** pattern. You can activate specific features by annotating your main application class or configuration classes.
+
+### 1. Core Utilities & API Standards
+Enabled by: `@EnableCommon`
+
+Provides global exception handling (`@ControllerAdvice`), standard API response wrappers (`ApiResponse<T>`), and common DTOs.
+
+**Usage:**
+```java
+@EnableCommon
+@SpringBootApplication
+public class MyServiceApplication { ... }
+```
+
+**Key Classes:**
+- `ApiResponse<T>`: Standard wrapper for all REST API responses.
+- `PageResponse<T>`: Standard pagination wrapper.
+- `GlobalExceptionHandler`: Centralized error handling.
+
+---
+
+### 2. Security & JWT
+Enabled by: `@EnableCustomSecurity`
+
+Provides JWT generation, validation, and security context management. It standardizes how services authenticate requests and manage user sessions.
+
+**Configuration (`application.properties`):**
+```properties
+# RSA Keys for JWT Signing (Base64 Encoded)
+jwt.rsa.private-key=MIIEvQIBADANBgkqhkiG...
+jwt.rsa.public-key=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
+
+# Token Expiration
+jwt.access-expiration=3600000       # 1 hour (in ms)
+jwt.refresh-expiration=604800000    # 7 days (in ms)
+```
+
+**Key Components:**
+- `JwtTokenProvider`: Generates and validates Access and Refresh tokens.
+- `SecurityUtils`: Helper to access the current authenticated user's context (e.g., User ID, Roles).
+
+---
+
+### 3. RSA Encryption Service
+Enabled by: `@EnableEncryption`
+
+Provides a robust RSA encryption service for securing sensitive data (PII, Secrets) at the application level. Supports chunked encryption for large payloads.
+
+**Configuration:**
+```properties
+# RSA Keys for Data Encryption (Base64 Encoded)
+rsa.private-key=MIIEvQIBADANBgkqhki...
+rsa.public-key=MIIBIjANBgkqhkiG9w0B...
+```
+
+**Usage:**
+```java
+@Autowired
+private EncryptionService encryptionService;
+
+public void secureData() {
+    String sensitive = "my-secret-data";
+    String encrypted = encryptionService.encrypt(sensitive);
+    String decrypted = encryptionService.decrypt(encrypted);
+}
+```
+
+---
+
+### 4. Caching
+Enabled by: `@EnableCache`
+
+Provides an abstraction over caching providers (currently supports **Ehcache** and **InMemory**). It allows for easy configuration of TTL (Time-To-Live) and Heap Size per cache or globally.
+
+**Configuration:**
+```properties
+# Cache Provider (options: ehcache, inmemory)
+itways.cache.provider=ehcache
+
+# Default Cache Settings
+itways.cache.ehcache.heapSum=1000
+itways.cache.ehcache.ttlMinutes=10  # Default TTL
+itways.cache.ehcache.resetTtlOnUpdate=false
+
+# Specific Cache Configuration (e.g., for 'otp' cache)
+itways.cache.caches.otp.ttlMinutes=5
+itways.cache.caches.otp.heapSize=500
+```
+
+**Usage:**
+Standard Spring Cache annotations work seamlessly.
+```java
+@Cacheable(value = "users", key = "#userId")
+public User getUser(String userId) { ... }
+```
+
+---
+
+### 5. Messaging & Notifications
+Enabled by: `@EnableNotifications`
+
+Configures the RabbitMQ infrastructure for the notification system. Sets up the necessary Exchanges, Queues, and Bindings for sending notifications (Email, SMS, etc.).
+
+**Configuration:**
+```properties
+# RabbitMQ Connection
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USERNAME:guest}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:guest}
+```
+
+**Key Components:**
+- `NotificationPublisher`: Service to publish `NotificationRequest` events to the message queue.
+- `NotificationRequest`: DTO defining the structure of a notification event.
+
+---
+
+### 6. Templating
+Enabled by: `@EnableFreeMarker`
+
+Configures FreeMarker for email template generation.
+
+---
+
+## 🛠️ Usage Example
+
+Here is a typical `SpringBootApplication` setup using `common-lib`:
 
 ```java
+package com.itways.myservice;
+
+import com.itways.annotation.*;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
 @SpringBootApplication
-@EnableCommon             // Activates shared DTOs, Handlers, and API Responders
-@EnableCustomSecurity     // Activates JWT and OTP Security infrastructure
-@EnableFreeMarker         // Activates document templating support
-@EnableNotificationMessaging // Activates RabbitMQ integration
-public class YourServiceApplication {
+@EnableCommon             // Core utils & Error handling
+@EnableCustomSecurity     // JWT & Security Context
+@EnableEncryption         // RSA Encryption Service
+@EnableCache              // Caching Support
+@EnableNotifications      // RabbitMQ Messaging
+public class MyServiceApplication {
+
     public static void main(String[] args) {
-        SpringApplication.run(YourServiceApplication.class, args);
+        SpringApplication.run(MyServiceApplication.class, args);
     }
 }
 ```
 
-## 📖 Main Utilities
+## 🏗️ Project Structure
 
-### 1. Unified Response Model
-Always wrap your API results for consistent client processing.
-
-```java
-@GetMapping("/{id}")
-public ResponseEntity<ApiResponse<UserDto>> getUser(@PathVariable Long id) {
-    UserDto user = userService.getById(id);
-    return ResponseEntity.ok(ApiResponse.success(user));
-}
 ```
-
-### 2. Security Utilities
-Access the authenticated user context anywhere in your logic.
-
-```java
-@Autowired
-private SecurityUtils securityUtils;
-
-public void processAction() {
-    String currentUserId = securityUtils.getCurrentUserId();
-    // ...
-}
+com.itways
+├── annotation      // Enable annotations (@EnableCommon, etc.)
+├── cache           // Caching implementation & config
+├── common          // Core DTOs, Exceptions, Restrictions
+├── encryption      // RSA Encryption logic
+├── freemarker      // Templating configuration
+├── notification    // Notification DTOs & Publishers
+└── security        // JWT, Security Context, Authentication
 ```
-
-### 3. JWT Management
-Manual token generation for specialized flows (e.g., Auth Service).
-
-```java
-@Autowired
-private JwtTokenProvider tokenProvider;
-
-public String createToken(Authentication auth) {
-    return tokenProvider.generateAccessToken(auth);
-}
-```
-
-## 🧩 Module Breakdown
-
-| Module | Annotation | Description |
-|--------|------------|-------------|
-| **Core** | `@EnableCommon` | Global exception handlers, Jackson config, and basic DTOs. |
-| **Security** | `@EnableCustomSecurity` | JWT Provider, OTP Service, and Security filters. |
-| **Templating** | `@EnableFreeMarker` | Configuration for FreeMarker engines. |
-| **Messaging** | `@EnableNotificationMessaging` | RabbitMQ auto-configuration for event-driven flows. |
 
 ## 📝 License
 
-Copyright © 2024 ITWays. All rights reserved.
+Copyright © 2024 Integral Ways. All rights reserved.

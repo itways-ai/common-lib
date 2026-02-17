@@ -16,7 +16,7 @@ public class NotificationRequest {
     private String subject;
     private String body;
     private Map<String, Object> metadata;
-    private Map<String, Object> providerConfig;
+    private EmailProviderConfig providerConfig;
     private String type; // EMAIL, SMS, PUSH
 
     // Constants for RabbitMQ (Defining here to be shared)
