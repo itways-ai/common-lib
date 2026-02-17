@@ -5,11 +5,11 @@ import org.ehcache.Cache;
 
 import java.util.Optional;
 
-public class EhcacheCacheStore<K, V> implements CacheStore<K, V> {
+public class EhcacheStore<K, V> implements CacheStore<K, V> {
 
     private final Cache<K, V> cache;
 
-    public EhcacheCacheStore(Cache<K, V> cache) {
+    public EhcacheStore(Cache<K, V> cache) {
         this.cache = cache;
     }
 

@@ -7,7 +7,7 @@ import com.itways.cache.CacheStoreFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class InMemoryCacheStoreFactory implements CacheStoreFactory {
+public class MemoryStoreFactory implements CacheStoreFactory {
 
     // Keep track of caches by name to return same instance if requested again
     private final Map<String, CacheStore<?, ?>> caches = new ConcurrentHashMap<>();
@@ -16,7 +16,7 @@ public class InMemoryCacheStoreFactory implements CacheStoreFactory {
     @Override
     public <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType,
             CacheConfig config) {
-        return (CacheStore<K, V>) caches.computeIfAbsent(cacheName, k -> new InMemoryCacheStore<K, V>(config));
+        return (CacheStore<K, V>) caches.computeIfAbsent(cacheName, k -> new MemoryStore<K, V>(config));
     }
 
     @SuppressWarnings("unchecked")
@@ -25,7 +25,7 @@ public class InMemoryCacheStoreFactory implements CacheStoreFactory {
         // For in-memory, we create it if it doesn't exist to behave similarly,
         // or we could return null. Given the usage, returning a cache is safer.
         return (CacheStore<String, String>) caches.computeIfAbsent(cacheName,
-                k -> new InMemoryCacheStore<String, String>(CacheConfig.defaultConfig()));
+                k -> new MemoryStore<String, String>(CacheConfig.defaultConfig()));
     }
 
     @Override

@@ -8,18 +8,17 @@ import org.ehcache.Cache;
 import org.ehcache.CacheManager;
 import org.ehcache.config.builders.CacheConfigurationBuilder;
 import org.ehcache.config.builders.CacheManagerBuilder;
-import org.ehcache.config.builders.ExpiryPolicyBuilder;
 import org.ehcache.config.builders.ResourcePoolsBuilder;
 import org.ehcache.config.units.EntryUnit;
 
 import java.time.Duration;
 
-public class EhcacheCacheStoreFactory implements CacheStoreFactory {
+public class EhcacheStoreFactory implements CacheStoreFactory {
 
     private final CacheManager cacheManager;
     private final CacheProperties properties;
 
-    public EhcacheCacheStoreFactory(CacheProperties properties) {
+    public EhcacheStoreFactory(CacheProperties properties) {
         // Initialize basic CacheManager. Caches will be added dynamically.
         this.cacheManager = CacheManagerBuilder.newCacheManagerBuilder().build(true);
         this.properties = properties;
@@ -41,7 +40,7 @@ public class EhcacheCacheStoreFactory implements CacheStoreFactory {
     public CacheStore<String, String> getCache(String cacheName) {
         Cache<String, String> cache = cacheManager.getCache(cacheName, String.class, String.class);
         if (cache != null) {
-            return new EhcacheCacheStore<>(cache);
+            return new EhcacheStore<>(cache);
         }
         throw new IllegalStateException(
                 "Cache '" + cacheName + "' not found. Ensure it is configured in application.properties.");
@@ -53,30 +52,41 @@ public class EhcacheCacheStoreFactory implements CacheStoreFactory {
         // Check if cache already exists to avoid exceptions
         Cache<K, V> existingCache = cacheManager.getCache(cacheName, keyType, valueType);
         if (existingCache != null) {
-            return new EhcacheCacheStore<>(existingCache);
+            return new EhcacheStore<>(existingCache);
         }
 
         synchronized (cacheManager) {
             // Double-check locking
             existingCache = cacheManager.getCache(cacheName, keyType, valueType);
             if (existingCache != null) {
-                return new EhcacheCacheStore<>(existingCache);
+                return new EhcacheStore<>(existingCache);
             }
 
             Cache<K, V> cache = cacheManager.createCache(cacheName,
                     CacheConfigurationBuilder.newCacheConfigurationBuilder(keyType, valueType,
                             ResourcePoolsBuilder.newResourcePoolsBuilder().heap(config.getHeapSize(),
                                     EntryUnit.ENTRIES))
-                            .withExpiry(ExpiryPolicyBuilder
-                                    .timeToLiveExpiration(Duration.ofMinutes(config.getTtlMinutes()))));
-            return new EhcacheCacheStore<>(cache);
+                            .withExpiry(new ExpiryPolicyConfig<>(
+                                    Duration.ofMinutes(config.getTtlMinutes()),
+                                    config.isResetTtlOnUpdate())));
+            return new EhcacheStore<>(cache);
         }
     }
 
     @Override
     public CacheStore<String, String> createCache(String cacheName) {
-        CacheConfig config = properties.getCaches().getOrDefault(cacheName, CacheConfig.defaultConfig());
-        // Ensure name is set
+        CacheConfig config = properties.getCaches().get(cacheName);
+        if (config == null) {
+            config = CacheConfig.builder()
+                    .name(cacheName)
+                    .ttlMinutes(properties.getEhcache().getTtlMinutes())
+                    .heapSize(properties.getEhcache().getHeapSize())
+                    .resetTtlOnUpdate(properties.getEhcache().isResetTtlOnUpdate())
+                    .build();
+        }
+
+        // Ensure name is set (if retrieved from map it might be null if not set in
+        // setters)
         if (config.getName() == null) {
             config.setName(cacheName);
         }

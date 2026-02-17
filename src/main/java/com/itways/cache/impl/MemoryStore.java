@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Note: Expiration cleanup is lazy (on access) or manual, not background
  * threaded in this simple version.
  */
-public class InMemoryCacheStore<K, V> implements CacheStore<K, V> {
+public class MemoryStore<K, V> implements CacheStore<K, V> {
 
     // Wrapper to hold value and expiry
     private static class CacheEntry<V> {
@@ -32,7 +32,7 @@ public class InMemoryCacheStore<K, V> implements CacheStore<K, V> {
     private final Map<K, CacheEntry<V>> store = new ConcurrentHashMap<>();
     private final CacheConfig config;
 
-    public InMemoryCacheStore(CacheConfig config) {
+    public MemoryStore(CacheConfig config) {
         this.config = config;
     }
 

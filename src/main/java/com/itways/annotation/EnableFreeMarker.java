@@ -7,10 +7,10 @@ import java.lang.annotation.Target;
 
 import org.springframework.context.annotation.Import;
 
-import com.itways.freemarker.FreeMarkerAutoConfiguration;
+import com.itways.freemarker.FreeMarkerConfig;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@Import(FreeMarkerAutoConfiguration.class)
+@Import(FreeMarkerConfig.class)
 public @interface EnableFreeMarker {
 }

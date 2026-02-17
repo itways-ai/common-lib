@@ -32,6 +32,11 @@ public class CacheProperties {
          * Default TTL in minutes
          */
         private int ttlMinutes = 10;
+
+        /**
+         * Whether to reset TTL on update. Default is false.
+         */
+        private boolean resetTtlOnUpdate = false;
     }
 
     /**

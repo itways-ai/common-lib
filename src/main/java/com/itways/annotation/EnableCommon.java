@@ -1,6 +1,6 @@
 package com.itways.annotation;
 
-import com.itways.common.config.CommonModuleConfiguration;
+import com.itways.common.config.CommonConfig;
 import org.springframework.context.annotation.Import;
 
 import java.lang.annotation.*;
@@ -8,6 +8,6 @@ import java.lang.annotation.*;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Import(CommonModuleConfiguration.class)
+@Import(CommonConfig.class)
 public @interface EnableCommon {
 }

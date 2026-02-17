@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TemplateDTO {
+public class Template {
     private Long id;
     private String name;
     private String type;

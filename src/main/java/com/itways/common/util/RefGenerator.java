@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 @Component
 @Slf4j
-public class TransactionReferenceGenerator {
+public class RefGenerator {
         /**
          * Generates a unique transaction reference with a custom prefix.
          *
