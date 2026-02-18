@@ -23,10 +23,10 @@ public class RsaService implements EncryptionService {
     private PrivateKey privateKey;
     private PublicKey publicKey;
 
-    @Value("${rsa.private-key}")
+    @Value("${jwt.rsa.private-key}")
     private String privateKeyString;
 
-    @Value("${rsa.public-key}")
+    @Value("${jwt.rsa.public-key}")
     private String publicKeyString;
 
     @PostConstruct

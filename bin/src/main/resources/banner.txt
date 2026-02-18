@@ -1,0 +1,18 @@
+${AnsiColor.CYAN}
+██╗    ██╗ █████╗ ███████╗███████╗███████╗██╗     
+██║    ██║██╔══██╗██╔════╝██╔════╝██╔════╝██║     
+██║ █╗ ██║███████║███████╗█████╗  █████╗  ██║     
+██║███╗██║██╔══██║╚════██║██╔══╝  ██╔══╝  ██║     
+╚███╔███╔╝██║  ██║███████║███████╗███████╗███████╗
+ ╚══╝╚══╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚══════╝
+${AnsiColor.GREEN}
+        W A S E E L  AI  P L A T F O R M
+${AnsiColor.YELLOW}
+--------------------------------------------------
+${AnsiColor.WHITE}
+:: Spring Boot ::  ${spring-boot.version}
+:: App Name    ::  ${spring.application.name}
+:: API Version ::  ${api.version:1.0.0}
+:: Profile     ::  ${spring.profiles.active:default}
+:: Developers  ::  Salah Atwa , Moaaz , Yazan
+--------------------------------------------------

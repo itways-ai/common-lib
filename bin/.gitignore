@@ -1,0 +1,29 @@
+# Maven
+target/
+/target/
+
+# Gradle
+build/
+
+# Eclipse
+.factorypath
+.project
+.classpath
+.settings/
+
+# Generated sources (MapStruct, etc.)
+target/generated-sources/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
