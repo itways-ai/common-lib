@@ -1,0 +1,681 @@
+# Common Library (`common-lib`) — Full Documentation
+
+> **Component Type:** Shared Java Library (JAR)
+> **Group:** `com.itways` | **Artifact:** `common-lib` | **Version:** `1.0.0`
+> **Java:** 21 | **Spring Boot:** 3.2.2 | **Build Tool:** Maven
+
+---
+
+## 1. High-Level Overview
+
+`common-lib` is a **shared utility library** that all microservices in the **AI Assistant Platform** depend on. It is **not** a standalone runnable application — it is packaged as a JAR and imported as a Maven dependency.
+
+Its purpose is to centralize **cross-cutting concerns** so that every microservice doesn't re-implement the same logic. Think of it as the *"foundation layer"* that every service in the platform stands on.
+
+**What it provides:**
+
+| Capability              | Enable Annotation        | What You Get                                          |
+|-------------------------|--------------------------|-------------------------------------------------------|
+| Core Utils & API Standards | `@EnableCommon`       | Unified API responses, global exception handling, Swagger config, error codes |
+| Security & JWT          | `@EnableCustomSecurity`  | JWT generation/validation, authentication filters, `@AccountId` injection, API Key authentication |
+| RSA Encryption          | `@EnableEncryption`      | RSA-based encrypt/decrypt for sensitive data (PII, passwords) |
+| Caching                 | `@EnableCache`           | Abstracted caching via Ehcache or in-memory, configurable per-cache TTL |
+| Notifications           | `@EnableNotifications`   | RabbitMQ-backed notification publishing (Email, SMS, Push) |
+| Templating              | `@EnableFreeMarker`      | FreeMarker template rendering from files or raw strings |
+
+**Key Design Decision:** Features are opt-in via custom `@Enable*` annotations. A service only activates the modules it needs — no bloated startup or unnecessary dependencies.
+
+---
+
+## 2. Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                 Consuming Microservice                  │
+│                                                         │
+│   @SpringBootApplication                                │
+│   @EnableCommon             ──► Core Utils               │
+│   @EnableCustomSecurity     ──► JWT + Auth Filters       │
+│   @EnableEncryption         ──► RSA Service              │
+│   @EnableCache              ──► Ehcache / InMemory       │
+│   @EnableNotifications      ──► RabbitMQ Publisher        │
+│   @EnableFreeMarker         ──► Template Rendering        │
+│                                                         │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│                    common-lib (JAR)                      │
+│                                                         │
+│   com.itways.annotation    ← Enable annotations          │
+│   com.itways.common        ← Responses, Exceptions, DTOs │
+│   com.itways.security      ← JWT, Filters, AccountId     │
+│   com.itways.encryption    ← RSA encrypt/decrypt         │
+│   com.itways.cache         ← Cache abstraction layer     │
+│   com.itways.notification  ← RabbitMQ messaging          │
+│   com.itways.freemarker    ← Template engine             │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**How the `@Enable*` pattern works under the hood:**
+
+Each annotation uses Spring's `@Import` to pull in a `@Configuration` class.
+That configuration class uses `@ComponentScan` to register all beans in its package.
+
+```
+@EnableCommon
+    └── @Import(CommonConfig.class)
+            └── @ComponentScan("com.itways.common")
+                    → GlobalExceptionHandler, CustomErrorController, SwaggerConfig, etc.
+```
+
+> **Important:** `@EnableCustomSecurity` *automatically* includes `@EnableCache` (because JWT replay protection and security context rely on caching). So if you enable security, caching comes for free.
+
+---
+
+## 3. Modules Breakdown
+
+### 3.1 — `annotation` (Enable Annotations)
+
+The entry point for consuming services. Six annotations, each activating a module:
+
+| Annotation | Imports Config | Also Enables |
+|---|---|---|
+| `@EnableCommon` | `CommonConfig` | — |
+| `@EnableCustomSecurity` | `SecurityConfig` | `@EnableCache` |
+| `@EnableEncryption` | `EncryptionConfig` | — |
+| `@EnableCache` | `CacheConfig` + `@EnableCaching` | — |
+| `@EnableNotifications` | `NotificationConfig` | — |
+| `@EnableFreeMarker` | `FreeMarkerConfig` | — |
+
+---
+
+### 3.2 — `common` (Core Utilities & API Standards)
+
+Activated by `@EnableCommon`. This is the most basic module and should almost always be enabled.
+
+#### `ApiResponse<T>` — Unified API Response Wrapper
+
+Every REST endpoint in the platform returns data wrapped in this:
+
+```java
+{
+    "timestamp": "2025-01-15T10:30:00",
+    "status": "success",      // or "error"
+    "message": "Operation completed successfully",
+    "data": { ... },          // actual payload (null on error)
+    "errorCode": null         // null on success, e.g. "AUTH_001" on error
+}
+```
+
+**Factory methods:**
+
+```java
+// Success
+ApiResponse.success(myData);
+ApiResponse.success("Profile updated", myData);
+
+// Error
+ApiResponse.error("Invalid credentials", ErrorCodes.INVALID_CREDENTIALS);
+```
+
+#### `PageResponse<T>` — Pagination Wrapper
+
+Standard pagination fields used across all list endpoints:
+
+```java
+PageResponse<User> page = PageResponse.<User>builder()
+    .content(userList)
+    .pageNo(0)
+    .pageSize(20)
+    .totalElements(150)
+    .totalPages(8)
+    .last(false)
+    .build();
+```
+
+#### `GlobalExceptionHandler` — Centralized Error Handling
+
+A `@RestControllerAdvice` that catches and formats errors into `ApiResponse`:
+
+| Exception Type | HTTP Status | Error Code |
+|---|---|---|
+| `BusinessException` | Custom (from exception) | Custom (from exception) |
+| `MethodArgumentNotValidException` | 400 | `VALIDATION_ERROR` |
+| Any other `Exception` | 500 | `INTERNAL_SERVER_ERROR` |
+
+#### `CustomErrorController` — Framework-Level Error Handling
+
+Catches errors that happen *outside* Spring MVC (e.g., 404 for missing paths, filter-level errors).
+Returns the same `ApiResponse` format so clients always get a consistent JSON structure.
+
+#### `ErrorCodes` — Shared Error Code Constants
+
+Centralized error codes used across all services:
+
+```java
+ErrorCodes.INVALID_CREDENTIALS  // "AUTH_001"
+ErrorCodes.USER_NOT_FOUND       // "AUTH_002"
+ErrorCodes.RESOURCE_NOT_FOUND   // "RES_001"
+ErrorCodes.VALIDATION_ERROR     // "VAL_001"
+ErrorCodes.INTERNAL_ERROR       // "SYS_001"
+ErrorCodes.UNAUTHORIZED         // "AUTH_401"
+ErrorCodes.FORBIDDEN            // "AUTH_403"
+ErrorCodes.BAD_REQUEST          // "REQ_001"
+// ... and more (OTP, CAPTCHA, ACCOUNT_LOCKED, etc.)
+```
+
+#### `BusinessException` — Base Exception
+
+Throw this from services when a business rule is violated:
+
+```java
+throw new BusinessException("Email already exists", ErrorCodes.USER_ALREADY_EXISTS, 409);
+throw new BusinessException("Account locked", ErrorCodes.ACCOUNT_LOCKED, 423);
+```
+
+#### `InvalidApiKeyException` — API Key Specific Exception
+
+Pre-built exception for invalid API keys (extends `BusinessException`, returns **401**).
+
+#### `SwaggerConfig` — OpenAPI / Swagger UI
+
+Configures Swagger with:
+- Title: *"AI Assistant API Platform"*
+- Bearer JWT authentication scheme
+- Auto-applied to all endpoints
+
+#### `RefGenerator` — Transaction Reference Generator
+
+Generates unique reference IDs (e.g., for OTP sessions):
+
+```java
+@Autowired
+private RefGenerator refGenerator;
+
+String ref = refGenerator.generate("OTP", 12);
+// Output: "OTP7A3B4C5D6E8F"
+```
+
+#### Shared DTOs
+
+- **`IntentResult`** — Represents AI intent classification results (intent name, confidence score, entities, original text, reasoning).
+- **`Template`** — Represents a notification/email template record (id, name, type, content, description, allowFailure, timestamps).
+
+---
+
+### 3.3 — `security` (Authentication & Authorization)
+
+Activated by `@EnableCustomSecurity`. This is the **most complex module** in the library.
+
+#### `JwtTokenProvider` — JWT Token Management
+
+Handles all JWT operations using **RSA key pairs** (RS256 signing):
+
+| Method | Purpose |
+|---|---|
+| `generateToken(username, role)` | Quick access token with a role claim |
+| `generateAccessToken(username, extraClaims)` | Access token with arbitrary claims |
+| `generateRefreshToken(username)` | Long-lived refresh token (type=REFRESH) |
+| `validateToken(token)` | Verifies signature + expiry, returns `boolean` |
+| `getUsernameFromToken(token)` | Extracts the `sub` (subject) claim |
+| `getAccountIdHashedFromToken(token)` | Extracts `accH` claim (hashed account ID) |
+| `getAccountIdEncryptedFromToken(token)` | Extracts `accE` claim (encrypted account ID) |
+| `getAccessExpiration()` | Returns the configured access token TTL in ms |
+
+**Token claims structure:**
+```json
+{
+  "sub": "john@example.com",
+  "role": "ADMIN",
+  "accH": "base64-sha256-hash-of-account-id",
+  "accE": "aes-encrypted-account-id",
+  "iat": 1705312200,
+  "exp": 1705315800
+}
+```
+
+**Dev fallback:** If no RSA keys are configured, it auto-generates a temporary key pair (useful for local development).
+
+#### `SecurityUtils` — AES Encryption for Short Values
+
+Provides **static** `hash()`, `encrypt()`, and `decrypt()` methods using AES:
+
+```java
+String hashed    = SecurityUtils.hash("account-123");     // SHA-256 → Base64
+String encrypted = SecurityUtils.encrypt("account-123");  // AES-ECB → Base64
+String decrypted = SecurityUtils.decrypt(encrypted);      // → "account-123"
+```
+
+> **Important detail:** This class is a Spring `@Component` but its methods are `static`. The encryption key is injected via `@Value` into a static field through a setter. This means the Spring context *must* be booted for it to work. Calling `SecurityUtils.encrypt()` before Spring initializes will throw `"Encryption key not initialized"`.
+
+#### `JwtAuthenticationFilter` — JWT Request Filter
+
+A `OncePerRequestFilter` that runs on every HTTP request:
+
+1. Extracts the `Authorization: Bearer <token>` header
+2. Validates the JWT via `JwtTokenProvider`
+3. Extracts `username`, `accH` (hashed account ID), `accE` (encrypted account ID)
+4. Verifies integrity: decrypts `accE` → hashes result → compares with `accH`
+5. Sets up `SecurityContextHolder` with a `UsernamePasswordAuthenticationToken`
+6. Stores `accountId` in `authentication.details` as a `Map`
+
+**If the token is absent or invalid, the filter simply does nothing** (no 401 thrown here — that's handled by Spring Security's own rules downstream).
+
+#### `ApiKeyAuthenticationFilter` — API Key Request Filter
+
+Similar flow but for the `X-API-KEY` header:
+
+1. Reads `X-API-KEY` header
+2. Delegates to `ApiKeyProvider` to parse/decrypt the key
+3. Validates the encrypted account ID against its hash
+4. Sets up `SecurityContextHolder` with details including `authSource: "API_KEY"` and `keyVersion`
+
+#### `ApiKeyProvider` — API Key Parser
+
+Parses API keys with format `sk_live_<AES-encrypted-payload>`:
+
+The payload, once decrypted, contains pipe-delimited parts:
+```
+accHash :: accEnc :: userEnc :: keyVersion :: padding
+```
+
+| Method | Returns |
+|---|---|
+| `getUsernameFromApiKey(key)` | Part index 2 — username |
+| `getAccountIdHashedFromApiKey(key)` | Part index 0 — account hash |
+| `getAccountIdEncryptedFromApiKey(key)` | Part index 1 — encrypted account |
+| `getKeyVersion(key)` | Part index 3 — integer version |
+
+#### `@AccountId` + `AccountIdArgumentResolver` — Controller Injection
+
+Inject the authenticated user's account ID directly into controller method parameters:
+
+```java
+@GetMapping("/profile")
+public ApiResponse<Profile> getProfile(@AccountId String accountId) {
+    // accountId is automatically extracted from the security context
+    // No need to manually parse JWT or dig into authentication details
+    return ApiResponse.success(profileService.getByAccountId(accountId));
+}
+```
+
+The resolver pulls the `accountId` from `authentication.getDetails()` → `Map<"accountId", ...>`, which was set by either `JwtAuthenticationFilter` or `ApiKeyAuthenticationFilter`.
+
+---
+
+### 3.4 — `encryption` (RSA Encryption Service)
+
+Activated by `@EnableEncryption`.
+
+#### `EncryptionService` (Interface)
+
+Simple contract:
+
+```java
+public interface EncryptionService {
+    String encrypt(String data);
+    String decrypt(String encryptedData);
+}
+```
+
+#### `RsaService` (Implementation)
+
+Uses **RSA/ECB/PKCS1Padding** with the same RSA keys as JWT:
+
+- **Encrypt:** plaintext → RSA encrypt with public key → Base64
+- **Decrypt:** Base64 → RSA decrypt with private key → plaintext
+- **Chunked decryption:** If the encrypted data contains `|` delimiters, it decrypts each chunk separately and concatenates the results. This handles payloads larger than the RSA key size limit (~245 bytes for 2048-bit keys).
+
+```java
+@Autowired
+private EncryptionService encryptionService;
+
+// Encrypt sensitive data before storing
+String encrypted = encryptionService.encrypt("user-ssn-123456789");
+
+// Decrypt when needed
+String original = encryptionService.decrypt(encrypted);
+```
+
+> **Note:** The `encrypt()` method does **not** handle chunking on the encryption side — that's the caller's responsibility (likely the frontend). The library only handles chunked *decryption*.
+
+---
+
+### 3.5 — `cache` (Caching Abstraction)
+
+Activated by `@EnableCache`.
+
+#### Architecture
+
+```
+CacheStoreFactory (interface)
+├── EhcacheStoreFactory (production)  ──► EhcacheStore (wraps Ehcache)
+└── MemoryStoreFactory  (dev/test)    ──► MemoryStore  (ConcurrentHashMap + manual TTL)
+
+CacheStore<K, V> (interface)
+├── put(key, value)
+├── get(key) → Optional<V>
+├── containsKey(key) → boolean
+├── remove(key)
+├── remove(key, value) → boolean  (conditional)
+└── clear()
+```
+
+#### Provider Selection
+
+Controlled by `itways.cache.provider` property:
+
+| Value | Factory | Default? |
+|---|---|---|
+| `ehcache` | `EhcacheStoreFactory` | ✅ Yes (matchIfMissing) |
+| `inmemory` | `MemoryStoreFactory` | No |
+
+#### Configuration
+
+```properties
+# Select provider
+itways.cache.provider=ehcache
+
+# Global defaults
+itways.cache.ehcache.heapSize=1000       # max entries
+itways.cache.ehcache.ttlMinutes=10       # default TTL
+itways.cache.ehcache.resetTtlOnUpdate=false
+
+# Per-cache overrides
+itways.cache.caches.otp.ttlMinutes=5
+itways.cache.caches.otp.heapSize=500
+itways.cache.caches.mfa-tokens.ttlMinutes=2
+itways.cache.caches.mfa-tokens.heapSize=200
+```
+
+#### Usage in Services (Programmatic)
+
+```java
+@Autowired
+private CacheStoreFactory cacheStoreFactory;
+
+// Get a pre-configured cache
+CacheStore<String, String> otpCache = cacheStoreFactory.getCache("otp");
+otpCache.put("user123", "482916");
+Optional<String> otp = otpCache.get("user123");
+
+// Create an ad-hoc cache with custom config
+CacheStore<String, String> myCache = cacheStoreFactory.createCache(
+    "session-data", String.class, String.class,
+    CacheConfig.builder().ttlMinutes(30).heapSize(500).build()
+);
+
+// Or let it auto-configure from properties (or use defaults)
+CacheStore<String, String> autoCache = cacheStoreFactory.createCache("my-cache");
+```
+
+#### Usage with Spring Annotations
+
+Standard `@Cacheable` / `@CacheEvict` / `@CachePut` also work because `@EnableCache` includes `@EnableCaching`, and a `ConcurrentMapCacheManager` is provided as a fallback `CacheManager` bean.
+
+```java
+@Cacheable(value = "users", key = "#userId")
+public User getUser(String userId) { ... }
+```
+
+#### ExpiryPolicyConfig — Custom TTL Behavior
+
+Controls whether updating a cache entry resets its TTL:
+- `resetTtlOnUpdate = false` (default): entry expires based on creation time only
+- `resetTtlOnUpdate = true`: every `put()` with the same key resets the TTL countdown
+
+---
+
+### 3.6 — `notification` (RabbitMQ Messaging)
+
+Activated by `@EnableNotifications`.
+
+#### RabbitMQ Topology
+
+| Resource | Value |
+|---|---|
+| Exchange | `notification.exchange` (TopicExchange) |
+| Queue | `notification.queue` (durable) |
+| Routing Key | `notification.routing.key` |
+
+#### `NotificationRequest` DTO
+
+```java
+NotificationRequest request = NotificationRequest.builder()
+    .recipient("user@example.com")
+    .subject("Welcome!")
+    .body("<html>...</html>")
+    .type("EMAIL")                           // EMAIL, SMS, PUSH
+    .metadata(Map.of("userId", "123"))
+    .providerConfig(EmailProviderConfig.builder()
+        .host("smtp.gmail.com")
+        .port(587)
+        .username("sender@gmail.com")
+        .password("app-password")
+        .from("noreply@myapp.com")
+        .build())
+    .build();
+```
+
+#### `NotificationPublisher`
+
+```java
+@Autowired
+private NotificationPublisher notificationPublisher;
+
+notificationPublisher.sendNotification(request);
+// → Message published to "notification.exchange" with routing key "notification.routing.key"
+```
+
+The consumer (listener) for these messages lives in a **separate notification service** — this library only handles the *publishing* side.
+
+---
+
+### 3.7 — `freemarker` (Template Rendering)
+
+Activated by `@EnableFreeMarker`.
+
+#### `TemplateRender`
+
+Two rendering modes:
+
+**From file** (classpath-based):
+```java
+@Autowired
+private TemplateRender templateRender;
+
+Map<String, Object> model = Map.of(
+    "username", "John",
+    "otpCode", "482916"
+);
+
+String html = templateRender.renderFromFile("templates/otp-email.ftlh", model);
+```
+
+- First tries FreeMarker's standard template loader
+- Falls back to Spring's `ResourceLoader` (better for JARs and classpath loading)
+
+**From string** (dynamic templates from DB):
+```java
+String templateContent = "Hello ${username}, your code is ${otpCode}";
+String rendered = templateRender.renderFromString(templateContent, model);
+// → "Hello John, your code is 482916"
+```
+
+- Uses a temporary `StringTemplateLoader` to avoid polluting the global configuration
+- Missing variables are silently ignored (configured via `IGNORE_HANDLER`)
+
+---
+
+## 4. Configuration Reference
+
+### Required Properties by Module
+
+#### `@EnableCustomSecurity` + `@EnableEncryption`
+
+```properties
+# RSA Keys (Base64-encoded, PKCS8 private / X509 public)
+jwt.rsa.private-key=MIIEvQIBADANBgkqhkiG...
+jwt.rsa.public-key=MIIBIjANBgkqhkiG9w0B...
+
+# Token expiration
+jwt.access-expiration=3600000        # 1 hour
+jwt.refresh-expiration=604800000     # 7 days
+
+# AES key for SecurityUtils (must be exactly 32 chars for AES-256)
+jwt.encryption.key=mySup3rS3cr3tAccIdK3y12345678901
+```
+
+#### `@EnableCache`
+
+```properties
+itways.cache.provider=ehcache                  # or "inmemory"
+itways.cache.ehcache.heapSize=1000
+itways.cache.ehcache.ttlMinutes=10
+itways.cache.ehcache.resetTtlOnUpdate=false
+
+# Per-cache overrides (optional)
+itways.cache.caches.<name>.ttlMinutes=5
+itways.cache.caches.<name>.heapSize=500
+```
+
+#### `@EnableNotifications`
+
+```properties
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USERNAME:guest}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:guest}
+```
+
+---
+
+## 5. How to Use (Consumer Service)
+
+### Step 1: Add Dependency
+
+```xml
+<dependency>
+    <groupId>com.itways</groupId>
+    <artifactId>common-lib</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### Step 2: Enable What You Need
+
+```java
+@SpringBootApplication
+@EnableCommon               // Almost always needed
+@EnableCustomSecurity       // If your service handles authenticated requests
+@EnableEncryption           // If you need RSA encrypt/decrypt
+@EnableNotifications        // If you publish notifications
+@EnableFreeMarker           // If you render email/notification templates
+public class MyServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MyServiceApplication.class, args);
+    }
+}
+```
+
+### Step 3: Register `AccountIdArgumentResolver` (if using `@AccountId`)
+
+In your consuming service's `WebMvcConfigurer`:
+
+```java
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(new AccountIdArgumentResolver());
+    }
+}
+```
+
+### Step 4: Configure Properties
+
+Add the required properties for the modules you enabled (see Configuration Reference above).
+
+---
+
+## 6. Known Issues & Technical Debt
+
+| # | Item | Severity | Details |
+|---|---|---|---|
+| 1 | **`SecurityUtils` uses static methods with Spring-injected key** | ⚠️ Medium | The AES encryption key is injected via `@Value` into a static field. If any code calls `SecurityUtils.encrypt()` before the Spring context is ready, it crashes. A non-static design would be safer. |
+| 2 | **`RsaService` reuses JWT RSA keys** | ⚠️ Medium | Both `JwtTokenProvider` and `RsaService` read from `jwt.rsa.private-key` / `jwt.rsa.public-key`. This couples JWT signing and data encryption to the same key pair. Ideally, these should be separate key pairs (e.g., `rsa.data.private-key`). |
+| 3 | **Encrypt-side chunking not implemented** | ⚠️ Low | `RsaService.decrypt()` handles `|`-delimited chunks, but `encrypt()` does not chunk large payloads. The assumption is that the frontend handles chunking. |
+| 4 | **No unit tests** | 🔴 High | The `src/test` directory is empty. No test coverage for any module. |
+| 5 | **`System.out.println` in `JwtTokenProvider`** | ⚠️ Low | Debug key generation uses `System.out.println` instead of the logger. |
+| 6 | **Duplicate class name `CacheConfig`** | ⚠️ Low | Both `com.itways.cache.CacheConfig` (the DTO) and `com.itways.cache.config.CacheConfig` (the Spring config) share the same simple name. This can cause import confusion. |
+| 7 | **Validation handler misuses `ApiResponse.success()`** | ⚠️ Low | `GlobalExceptionHandler.handleValidationExceptions()` creates a response via `ApiResponse.success()` and then manually sets status to `"error"`. Should use `ApiResponse.error()` or a dedicated factory method. |
+| 8 | **`MemoryStore` has lazy expiration only** | ⚠️ Low | Expired entries are only cleaned up on access (`get`/`containsKey`). There's no background cleanup thread, so memory can accumulate stale entries. |
+
+---
+
+## 7. Quick Mental Model
+
+Think of `common-lib` like a **toolbox** that every microservice opens at startup:
+
+```
+YOU'RE BUILDING A NEW MICROSERVICE?
+                │
+                ▼
+     Add common-lib dependency
+                │
+                ▼
+     Annotate your main class:
+     ┌──────────────────────────────────────┐
+     │ @EnableCommon          (ALWAYS)       │ ← API responses, error handling, swagger
+     │ @EnableCustomSecurity  (if authed)    │ ← JWT filter, @AccountId, API keys
+     │ @EnableEncryption      (if sensitive)  │ ← RSA encrypt/decrypt
+     │ @EnableCache           (if caching)    │ ← Ehcache or in-memory
+     │ @EnableNotifications   (if messaging)  │ ← Publish to RabbitMQ
+     │ @EnableFreeMarker      (if templates)  │ ← Render email templates
+     └──────────────────────────────────────┘
+                │
+                ▼
+     Add required properties to application.properties
+                │
+                ▼
+     Done! All the utilities are auto-injected.
+     Just @Autowire what you need.
+```
+
+**The two encryption systems (don't mix them up):**
+
+| System | Class | Algorithm | Used For |
+|---|---|---|---|
+| **AES** | `SecurityUtils` | AES-ECB | Short values — account IDs embedded in JWT claims and API keys |
+| **RSA** | `RsaService` (`EncryptionService`) | RSA-PKCS1 | Data at rest — passwords, PII, sensitive payloads from frontend |
+
+**The two authentication paths:**
+
+```
+HTTP Request
+    │
+    ├── Has "Authorization: Bearer <jwt>" header?
+    │       └── JwtAuthenticationFilter → validate JWT → set SecurityContext
+    │
+    └── Has "X-API-KEY: sk_live_..." header?
+            └── ApiKeyAuthenticationFilter → parse/decrypt key → set SecurityContext
+```
+
+Both filters set the same `SecurityContext` shape, so downstream code (including `@AccountId`) works identically regardless of auth method.
+
+---
+
+## 8. TL;DR
+
+`common-lib` is a **shared Java library (JAR)** for the AI Assistant Platform's microservices. It provides **opt-in modules** via `@Enable*` annotations:
+
+- **`@EnableCommon`** — Standardized `ApiResponse<T>`, global exception handling, Swagger, error codes, shared DTOs.
+- **`@EnableCustomSecurity`** — RSA-signed JWT tokens, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `@AccountId` parameter injection, `SecurityUtils` (AES hash/encrypt/decrypt).
+- **`@EnableEncryption`** — RSA-based `EncryptionService` for sensitive data with chunked decryption support.
+- **`@EnableCache`** — Abstracted caching with Ehcache (production) or in-memory (dev), configurable TTL per cache.
+- **`@EnableNotifications`** — RabbitMQ publisher for Email/SMS/Push notifications.
+- **`@EnableFreeMarker`** — FreeMarker template rendering from files or dynamic strings.
+
+**To use:** Add the Maven dependency, annotate your main class, configure RSA keys and RabbitMQ as needed. No deployment needed — it's a library, not a service.
