@@ -14,6 +14,7 @@ jobs:
 
     permissions:
       contents: write  # needed to push commits and tags
+      packages: write
 
     steps:
       - name: Checkout code
@@ -26,6 +27,22 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+
+      # IMPORTANT: Maven settings for GitHub Packages auth
+      - name: Setup Maven settings
+        run: |
+          mkdir -p ~/.m2
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
 
       - name: Get current version from pom.xml
         id: get_version
@@ -48,6 +65,11 @@ jobs:
           git config user.email "actions@github.com"
           git commit -am "chore: bump version to ${{ env.new_version }}"
           git push origin main
+
+      - name: Publish to GitHub Packages
+        run: mvn deploy -DskipTests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push tag
         run: |
