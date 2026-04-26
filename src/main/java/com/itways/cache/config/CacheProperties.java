@@ -21,6 +21,11 @@ public class CacheProperties {
      */
     private EhcacheProperties ehcache = new EhcacheProperties();
 
+    /**
+     * Default Redis configuration properties
+     */
+    private RedisProperties redis = new RedisProperties();
+
     @Data
     public static class EhcacheProperties {
         /**
@@ -37,6 +42,14 @@ public class CacheProperties {
          * Whether to reset TTL on update. Default is false.
          */
         private boolean resetTtlOnUpdate = false;
+    }
+
+    @Data
+    public static class RedisProperties {
+        /**
+         * Default TTL in minutes for Redis cache entries
+         */
+        private int ttlMinutes = 10;
     }
 
     /**
