@@ -1,6 +1,7 @@
 package com.itways.common.handler;
 
 import com.itways.common.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.web.servlet.error.ErrorController;
@@ -15,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
  * (e.g., 404s for non-existent paths, errors in filters).
  */
 @RestController
+@Hidden
 public class CustomErrorController implements ErrorController {
 
+    @Hidden
     @RequestMapping("/error")
     public ResponseEntity<ApiResponse<Object>> handleError(HttpServletRequest request) {
         Object status = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
