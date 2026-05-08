@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 public class CacheConfig {
     private String name;
     @Builder.Default
-    private int ttlMinutes = 10;
+    private int ttlMinutes=10;
     @Builder.Default
-    private int heapSize = 1000;
+    private int heapSize=1000;
     @Builder.Default
     private boolean resetTtlOnUpdate = false;
 
