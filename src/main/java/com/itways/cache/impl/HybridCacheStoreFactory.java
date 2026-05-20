@@ -6,11 +6,7 @@ import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.config.CacheProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
 
-@Primary
-@Component
 @RequiredArgsConstructor
 @Slf4j
 public class HybridCacheStoreFactory implements CacheStoreFactory {
