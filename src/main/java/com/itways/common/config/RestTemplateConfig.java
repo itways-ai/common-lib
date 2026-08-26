@@ -20,7 +20,7 @@ import org.springframework.web.client.RestTemplate;
  * certificates so AI provider calls survive corporate proxies. A type-based
  * {@code @ConditionalOnMissingBean} would see that bean, back off, and leave the
  * only RestTemplate in the context a certificate-ignoring one — which
- * speech-service's Telegram and Twilio senders would then pick up by type.
+ * assistant-service's Telegram and Twilio senders would then pick up by type.
  *
  * A service needing its own transport should declare a bean named
  * {@code restTemplate}; this one then steps aside. Note the back-off is only
