@@ -9,7 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * API keys are self-describing: {@code sk_live_} + AES(accHash::accEnc::userEnc::version::padding).
+ * API keys are self-describing: {@code sk_live_} +
+ * AES-GCM(accHash::accEnc::userEnc::version::expiresAtEpochMillis::padding).
  * The provider is the only parser of that envelope, and the auth filter trusts
  * whatever it extracts — so the parsing contract and its failure modes are the
  * security surface.
@@ -42,13 +43,24 @@ class ApiKeyProviderTest {
     }
 
     @Test
-    @DisplayName("extracts the hash, encrypted account, and version from a well-formed key")
+    @DisplayName("extracts the hash, encrypted account, version, and expiry from a well-formed key")
     void extractsParts() {
-        String apiKey = mintKey("the-hash::the-enc-account::the-enc-user::2::padpadpad");
+        String apiKey = mintKey("the-hash::the-enc-account::the-enc-user::2::1893456000000::padpadpad");
 
         assertThat(provider.getAccountIdHashedFromApiKey(apiKey)).isEqualTo("the-hash");
         assertThat(provider.getAccountIdEncryptedFromApiKey(apiKey)).isEqualTo("the-enc-account");
         assertThat(provider.getKeyVersion(apiKey)).isEqualTo(2);
+        assertThat(provider.getExpiresAtEpochMillis(apiKey)).isEqualTo(1893456000000L);
+    }
+
+    @Test
+    @DisplayName("an expiry slot of 0 means the key never expires, and a garbled slot degrades to 0")
+    void expiryFallback() {
+        assertThat(provider.getExpiresAtEpochMillis(mintKey("h::acc::user::1::0::pad"))).isZero();
+        assertThat(provider.getExpiresAtEpochMillis(mintKey("h::acc::user::1::not-a-number::pad"))).isZero();
+        // A payload without the slot at all (pre-expiry shape) also degrades
+        // to "no expiry" rather than failing the key outright.
+        assertThat(provider.getExpiresAtEpochMillis(mintKey("h::acc::user::1"))).isZero();
     }
 
     @Test

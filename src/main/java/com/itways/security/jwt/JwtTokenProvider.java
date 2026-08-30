@@ -36,9 +36,18 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() throws Exception {
-        if (privateKeyStr != null && !privateKeyStr.isEmpty() && publicKeyStr != null && !publicKeyStr.isEmpty()) {
-            this.privateKey = loadPrivateKey(privateKeyStr);
+        boolean hasPrivate = privateKeyStr != null && !privateKeyStr.isEmpty();
+        boolean hasPublic = publicKeyStr != null && !publicKeyStr.isEmpty();
+
+        if (hasPublic) {
+            // Verify-only is a first-class mode: only auth-service signs
+            // tokens, so every other service is configured with just the
+            // public key and never sees the private key.
             this.publicKey = loadPublicKey(publicKeyStr);
+            this.privateKey = hasPrivate ? loadPrivateKey(privateKeyStr) : null;
+        } else if (hasPrivate) {
+            throw new IllegalStateException(
+                    "jwt.rsa.private-key is set but jwt.rsa.public-key is not — configure the public key too");
         } else {
             // Generate for development if not provided
             KeyPair keyPair = Keys.keyPairFor(io.jsonwebtoken.SignatureAlgorithm.RS512);
@@ -46,6 +55,14 @@ public class JwtTokenProvider {
             this.publicKey = keyPair.getPublic();
             System.out.println("DEBUG: Generated temporary RSA keys for JWT.");
         }
+    }
+
+    private PrivateKey requireSigningKey() {
+        if (privateKey == null) {
+            throw new IllegalStateException(
+                    "No jwt.rsa.private-key configured — this service verifies tokens but cannot mint them");
+        }
+        return privateKey;
     }
 
     private PrivateKey loadPrivateKey(String key) throws Exception {
@@ -75,7 +92,7 @@ public class JwtTokenProvider {
                 .claims(extraClaims)
                 .issuedAt(now)
                 .expiration(expiryDate)
-                .signWith(privateKey, Jwts.SIG.RS256)
+                .signWith(requireSigningKey(), Jwts.SIG.RS256)
                 .compact();
     }
 
@@ -88,7 +105,7 @@ public class JwtTokenProvider {
                 .claim("type", "REFRESH")
                 .issuedAt(now)
                 .expiration(expiryDate)
-                .signWith(privateKey, Jwts.SIG.RS256)
+                .signWith(requireSigningKey(), Jwts.SIG.RS256)
                 .compact();
     }
 

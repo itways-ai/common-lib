@@ -32,43 +32,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		try {
-			String jwt = getJwtFromRequest(request);
+		String jwt = getJwtFromRequest(request);
 
-			if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-				String username = tokenProvider.getUsernameFromToken(jwt);
+		if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+			String username = null;
+			String accountId = null;
+			try {
+				username = tokenProvider.getUsernameFromToken(jwt);
 				String accH = tokenProvider.getAccountIdHashedFromToken(jwt);
 				String accE = tokenProvider.getAccountIdEncryptedFromToken(jwt);
 
-				String accountId = null;
 				if (accH != null && accE != null) {
-					try {
-						String decryptedAcc = SecurityUtils.decrypt(accE);
-						String hashedAcc = SecurityUtils.hash(decryptedAcc);
-						if (hashedAcc.equals(accH)) {
-							accountId = decryptedAcc;
-						}
-					} catch (Exception e) {
-						logger.error("Failed to decrypt or validate accountId: " + e.getMessage());
+					String decryptedAcc = SecurityUtils.decrypt(accE);
+					String hashedAcc = SecurityUtils.hash(decryptedAcc);
+					if (hashedAcc.equals(accH)) {
+						accountId = decryptedAcc;
 					}
 				}
-
-				// For simplicity in microservices, we might not have a full UserDetailsService
-				// locally
-				// We trust the JWT and the gateway. We can create a principal from the claims.
-				UserDetails userDetails = new User(username, "", Collections.emptyList());
-
-				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-						userDetails, null, userDetails.getAuthorities());
-
-				// Set accountId in details for resolver to pick up
-				authentication.setDetails(Map.of("accountId", accountId != null ? accountId : "N/A", "remoteAddress",
-						request.getRemoteAddr()));
-
-				SecurityContextHolder.getContext().setAuthentication(authentication);
+			} catch (Exception e) {
+				logger.error("Failed to decrypt or validate accountId: " + e.getMessage());
 			}
-		} catch (Exception ex) {
-			logger.error("Could not set user authentication in security context", ex);
+
+			// A valid signature with a broken (or absent) tenant binding is a
+			// forged or corrupted token. Reject it outright — the previous
+			// behavior of proceeding as pseudo-tenant "N/A" let every
+			// account-scoped query run against a shared bogus tenant.
+			if (accountId == null) {
+				logger.warn("JWT tenant binding failed (accH/accE mismatch or missing) — rejecting request");
+				SecurityContextHolder.clearContext();
+				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+				response.setContentType("application/json");
+				response.getWriter().write("{\"success\":false,\"message\":\"Invalid token: tenant binding failed\"}");
+				return;
+			}
+
+			// For simplicity in microservices, we might not have a full
+			// UserDetailsService locally. We trust the JWT and the gateway, and
+			// create a principal from the claims.
+			UserDetails userDetails = new User(username, "", Collections.emptyList());
+
+			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+					userDetails, null, userDetails.getAuthorities());
+
+			// Set accountId in details for resolver to pick up
+			authentication.setDetails(Map.of("accountId", accountId, "remoteAddress", request.getRemoteAddr()));
+
+			SecurityContextHolder.getContext().setAuthentication(authentication);
 		}
 
 		filterChain.doFilter(request, response);

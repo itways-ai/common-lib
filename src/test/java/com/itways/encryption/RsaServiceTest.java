@@ -70,4 +70,23 @@ class RsaServiceTest {
 
         assertThatThrownBy(broken::loadKeys).isInstanceOf(RuntimeException.class);
     }
+
+    @Test
+    @DisplayName("absent key material boots fine and fails only at first use, with a pointer to the env var")
+    void absentKeysBootButRefuseUse() {
+        // Services that @EnableEncryption transitively but never call the
+        // service (channels-service) must boot without the keypair in their
+        // environment — the secrets were externalized out of their config.
+        RsaService keyless = new RsaService();
+        ReflectionTestUtils.setField(keyless, "privateKeyString", "");
+        ReflectionTestUtils.setField(keyless, "publicKeyString", "");
+        keyless.loadKeys();
+
+        assertThatThrownBy(() -> keyless.encrypt("data"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("RSA_PUBLIC_KEY");
+        assertThatThrownBy(() -> keyless.decrypt("data"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("RSA_PRIVATE_KEY");
+    }
 }

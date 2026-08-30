@@ -1,6 +1,7 @@
 package com.itways.security.servlet;
 
 import com.itways.security.ApiKeyProvider;
+import com.itways.security.ApiKeyRevocationStore;
 import com.itways.security.SecurityUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private final ApiKeyProvider apiKeyProvider;
+    private final ApiKeyRevocationStore revocationStore;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -52,6 +54,16 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                     logger.error("API Key decryption or hash validation failed: " + ex.getMessage());
                 }
 
+                if (accountId != null && isExpired(apiKey)) {
+                    logger.warn("API Key is past its embedded expiry — refusing to authenticate");
+                    accountId = null;
+                }
+
+                if (accountId != null && revocationStore.isRevoked(SecurityUtils.hash(apiKey))) {
+                    logger.warn("API Key is on the revocation deny-list — refusing to authenticate");
+                    accountId = null;
+                }
+
                 if (accountId != null) {
                     // Validated identity
                     UserDetails userDetails = new User(username, "", Collections.emptyList());
@@ -73,5 +85,10 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isExpired(String apiKey) {
+        long expiresAtMillis = apiKeyProvider.getExpiresAtEpochMillis(apiKey);
+        return expiresAtMillis > 0 && expiresAtMillis <= System.currentTimeMillis();
     }
 }

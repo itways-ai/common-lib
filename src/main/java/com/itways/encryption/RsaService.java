@@ -23,10 +23,14 @@ public class RsaService implements EncryptionService {
     private PrivateKey privateKey;
     private PublicKey publicKey;
 
-    @Value("${jwt.rsa.private-key}")
+    // Empty defaults: a service that never calls encrypt()/decrypt() (it only
+    // @EnableEncryption's transitively) must still boot without the keypair in
+    // its environment. Present-but-unloadable key material still fails startup
+    // loudly; an absent key fails at first use with a clear message instead.
+    @Value("${jwt.rsa.private-key:}")
     private String privateKeyString;
 
-    @Value("${jwt.rsa.public-key}")
+    @Value("${jwt.rsa.public-key:}")
     private String publicKeyString;
 
     @PostConstruct
@@ -34,19 +38,27 @@ public class RsaService implements EncryptionService {
         try {
             java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("RSA");
 
-            // Load Private Key
-            byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyString);
-            java.security.spec.PKCS8EncodedKeySpec privateKeySpec = new java.security.spec.PKCS8EncodedKeySpec(
-                    privateKeyBytes);
-            this.privateKey = keyFactory.generatePrivate(privateKeySpec);
+            if (privateKeyString != null && !privateKeyString.isBlank()) {
+                byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyString);
+                java.security.spec.PKCS8EncodedKeySpec privateKeySpec = new java.security.spec.PKCS8EncodedKeySpec(
+                        privateKeyBytes);
+                this.privateKey = keyFactory.generatePrivate(privateKeySpec);
+            } else {
+                log.warn("No jwt.rsa.private-key configured — RSA decryption is unavailable in this service.");
+            }
 
-            // Load Public Key
-            byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyString);
-            java.security.spec.X509EncodedKeySpec publicKeySpec = new java.security.spec.X509EncodedKeySpec(
-                    publicKeyBytes);
-            this.publicKey = keyFactory.generatePublic(publicKeySpec);
+            if (publicKeyString != null && !publicKeyString.isBlank()) {
+                byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyString);
+                java.security.spec.X509EncodedKeySpec publicKeySpec = new java.security.spec.X509EncodedKeySpec(
+                        publicKeyBytes);
+                this.publicKey = keyFactory.generatePublic(publicKeySpec);
+            } else {
+                log.warn("No jwt.rsa.public-key configured — RSA encryption is unavailable in this service.");
+            }
 
-            log.info("✅ RSA Keys loaded successfully from configuration.");
+            if (privateKey != null || publicKey != null) {
+                log.info("✅ RSA Keys loaded successfully from configuration.");
+            }
         } catch (Exception e) {
             log.error("❌ Failed to load RSA Keys from configuration", e);
             throw new RuntimeException("Failed to load RSA Keys", e);
@@ -70,6 +82,10 @@ public class RsaService implements EncryptionService {
 
     @Override
     public String encrypt(String data) {
+        if (publicKey == null) {
+            throw new IllegalStateException(
+                    "jwt.rsa.public-key is not configured — set RSA_PUBLIC_KEY to use RSA encryption");
+        }
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
@@ -83,6 +99,10 @@ public class RsaService implements EncryptionService {
 
     @Override
     public String decrypt(String encryptedData) {
+        if (privateKey == null) {
+            throw new IllegalStateException(
+                    "jwt.rsa.private-key is not configured — set RSA_PRIVATE_KEY to use RSA decryption");
+        }
         try {
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.DECRYPT_MODE, privateKey);

@@ -30,6 +30,19 @@ public class ApiKeyProvider {
         }
     }
 
+    /**
+     * Expiry instant carried inside the key payload, as epoch millis.
+     * {@code 0} means the key never expires. A missing or unparseable slot
+     * also degrades to 0 (no expiry), mirroring {@link #getKeyVersion}.
+     */
+    public long getExpiresAtEpochMillis(String apiKey) {
+        try {
+            return Long.parseLong(getParts(apiKey)[4]);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
     private String[] getParts(String apiKey) {
         if (apiKey == null || !apiKey.startsWith(PREFIX)) {
             throw new InvalidApiKeyException("Invalid API Key format");
@@ -40,10 +53,10 @@ public class ApiKeyProvider {
             if (decrypted == null) {
                 throw new InvalidApiKeyException();
             }
-            // Parts: accHash :: accEnc :: userEnc :: keyVersion :: padding
+            // Parts: accHash :: accEnc :: userEnc :: keyVersion :: expiresAtEpochMillis :: padding
             return decrypted.split(SEPARATOR);
         } catch (Exception e) {
-            log.error("Failed to parse API key", e);
+            log.error("Failed to parse API key");
             throw new InvalidApiKeyException();
         }
     }

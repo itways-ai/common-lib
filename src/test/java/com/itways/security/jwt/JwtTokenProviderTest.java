@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * JwtTokenProvider is the platform's only token issuer and verifier. The
@@ -137,6 +138,54 @@ class JwtTokenProviderTest {
             assertThat(provider.validateToken("not.a.token")).isFalse();
             assertThat(provider.validateToken("")).isFalse();
             assertThat(provider.validateToken(null)).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("verify-only mode")
+    class VerifyOnly {
+
+        private JwtTokenProvider verifierWith(KeyPair pair) throws Exception {
+            JwtTokenProvider verifier = new JwtTokenProvider();
+            ReflectionTestUtils.setField(verifier, "privateKeyStr", "");
+            ReflectionTestUtils.setField(verifier, "publicKeyStr",
+                    Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()));
+            ReflectionTestUtils.setField(verifier, "accessExpiration", 60_000L);
+            verifier.init();
+            return verifier;
+        }
+
+        @Test
+        @DisplayName("a public-key-only provider verifies the signer's tokens")
+        void publicOnlyVerifies() throws Exception {
+            // This is the production posture of every service but auth-service:
+            // RSA_PUBLIC_KEY set, no private key anywhere in its environment.
+            JwtTokenProvider verifier = verifierWith(keyPair);
+
+            String token = provider.generateToken("user@example.com", "USER");
+            assertThat(verifier.validateToken(token)).isTrue();
+            assertThat(verifier.getUsernameFromToken(token)).isEqualTo("user@example.com");
+        }
+
+        @Test
+        @DisplayName("a public-key-only provider refuses to mint tokens with a clear error")
+        void publicOnlyCannotSign() throws Exception {
+            JwtTokenProvider verifier = verifierWith(keyPair);
+
+            assertThatThrownBy(() -> verifier.generateToken("user@example.com", "USER"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("cannot mint");
+        }
+
+        @Test
+        @DisplayName("a private key without a public key is a misconfiguration and fails init")
+        void privateWithoutPublicFailsFast() throws Exception {
+            JwtTokenProvider broken = new JwtTokenProvider();
+            ReflectionTestUtils.setField(broken, "privateKeyStr",
+                    Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()));
+            ReflectionTestUtils.setField(broken, "publicKeyStr", "");
+
+            assertThatThrownBy(broken::init).isInstanceOf(IllegalStateException.class);
         }
     }
 
