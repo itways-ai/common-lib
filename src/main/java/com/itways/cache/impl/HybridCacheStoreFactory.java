@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.config.CacheProperties;
@@ -17,7 +17,7 @@ public class HybridCacheStoreFactory implements CacheStoreFactory {
     private final CacheProperties properties;
 
     @Override
-    public <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType, CacheConfig config) {
+    public <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType, CacheSettings config) {
         if ("redis".equalsIgnoreCase(properties.getProvider()) && redisHealthChecker.isAvailable()) {
             log.info("✅ [Cache] Using Redis for cache '{}' (TTL={}min)", cacheName, config.getTtlMinutes());
             return redisStoreFactory.createCache(cacheName, keyType, valueType, config);

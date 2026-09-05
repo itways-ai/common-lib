@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.config.CacheProperties;
@@ -22,7 +22,7 @@ public class RedisStoreFactory implements CacheStoreFactory {
     public <K, V> CacheStore<K, V> createCache(String cacheName
             , Class<K> keyType
             , Class<V> valueType
-            , CacheConfig config) {
+            , CacheSettings config) {
 
         return (CacheStore<K, V>) new RedisStore<>(redisTemplate,cacheName,config.getTtlMinutes());
     }

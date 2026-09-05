@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,18 +18,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * clock to fake. Instead of sleeping, the expiry tests use a negative
  * ttlMinutes so every entry is already expired the moment put() returns:
  * deterministic and instant. (Also worth knowing, though not asserted:
- * CacheConfig.heapSize is ignored by this implementation — the map is
+ * CacheSettings.heapSize is ignored by this implementation — the map is
  * unbounded.)
  */
 @DisplayName("MemoryStore")
 class MemoryStoreTest {
 
     /** Entries written under this config are expired before put() returns. */
-    private static final CacheConfig EXPIRED_ON_ARRIVAL =
-            CacheConfig.builder().ttlMinutes(-1).build();
+    private static final CacheSettings EXPIRED_ON_ARRIVAL =
+            CacheSettings.builder().ttlMinutes(-1).build();
 
     private MemoryStore<String, String> freshStore() {
-        return new MemoryStore<>(CacheConfig.defaultConfig()); // 10-minute TTL
+        return new MemoryStore<>(CacheSettings.defaultConfig()); // 10-minute TTL
     }
 
     private MemoryStore<String, String> expiredStore() {

@@ -55,14 +55,14 @@ class RedisStoreTest {
 
             store().put("k1", "v1");
 
-            verify(valueOps).set("session.k1", "v1", 5L, TimeUnit.MINUTES);
+            verify(valueOps).set("nibras:cache:session:k1", "v1", 5L, TimeUnit.MINUTES);
         }
 
         @Test
         @DisplayName("get reads the namespaced key and wraps hits and misses in Optional")
         void getNamespaces() {
             when(redisTemplate.opsForValue()).thenReturn(valueOps);
-            when(valueOps.get("session.k1")).thenReturn("v1");
+            when(valueOps.get("nibras:cache:session:k1")).thenReturn("v1");
 
             RedisStore<String, String> store = store();
             assertThat(store.get("k1")).contains("v1");
@@ -72,7 +72,7 @@ class RedisStoreTest {
         @Test
         @DisplayName("containsKey asks Redis for the namespaced key")
         void containsKeyNamespaces() {
-            when(redisTemplate.hasKey("session.k1")).thenReturn(true);
+            when(redisTemplate.hasKey("nibras:cache:session:k1")).thenReturn(true);
 
             assertThat(store().containsKey("k1")).isTrue();
         }
@@ -82,20 +82,20 @@ class RedisStoreTest {
         void removeNamespaces() {
             store().remove("k1");
 
-            verify(redisTemplate).delete("session.k1");
+            verify(redisTemplate).delete("nibras:cache:session:k1");
         }
 
         @Test
         @DisplayName("clear deletes exactly the keys matching this cache's prefix pattern")
         void clearUsesPrefixPattern() {
-            // The glob 'session.*' is what stops one cache's clear() from
+            // The glob 'nibras:cache:session:*' is what stops one cache's clear() from
             // wiping every other cache sharing the Redis instance.
-            when(redisTemplate.keys("session.*"))
-                    .thenReturn(Set.<Object>of("session.k1", "session.k2"));
+            when(redisTemplate.keys("nibras:cache:session:*"))
+                    .thenReturn(Set.<Object>of("nibras:cache:session:k1", "nibras:cache:session:k2"));
 
             store().clear();
 
-            verify(redisTemplate).delete(Set.<Object>of("session.k1", "session.k2"));
+            verify(redisTemplate).delete(Set.<Object>of("nibras:cache:session:k1", "nibras:cache:session:k2"));
         }
     }
 
@@ -107,8 +107,8 @@ class RedisStoreTest {
         @DisplayName("removes and reports true when the current value matches")
         void matchingValue() {
             when(redisTemplate.opsForValue()).thenReturn(valueOps);
-            when(valueOps.get("session.k1")).thenReturn("v1");
-            when(redisTemplate.delete("session.k1")).thenReturn(true);
+            when(valueOps.get("nibras:cache:session:k1")).thenReturn("v1");
+            when(redisTemplate.delete("nibras:cache:session:k1")).thenReturn(true);
 
             assertThat(store().remove("k1", "v1")).isTrue();
         }
@@ -121,7 +121,7 @@ class RedisStoreTest {
             // between get and delete and its fresh value gets removed anyway.
             // Only the single-process semantics are pinned here.
             when(redisTemplate.opsForValue()).thenReturn(valueOps);
-            when(valueOps.get("session.k1")).thenReturn("other");
+            when(valueOps.get("nibras:cache:session:k1")).thenReturn("other");
 
             assertThat(store().remove("k1", "v1")).isFalse();
             verify(redisTemplate, never()).delete(anyString());

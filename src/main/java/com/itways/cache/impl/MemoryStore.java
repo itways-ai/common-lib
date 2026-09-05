@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 
 import java.util.Map;
@@ -30,9 +30,9 @@ public class MemoryStore<K, V> implements CacheStore<K, V> {
     }
 
     private final Map<K, CacheEntry<V>> store = new ConcurrentHashMap<>();
-    private final CacheConfig config;
+    private final CacheSettings config;
 
-    public MemoryStore(CacheConfig config) {
+    public MemoryStore(CacheSettings config) {
         this.config = config;
     }
 

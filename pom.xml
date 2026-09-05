@@ -6,7 +6,7 @@
 
 	<groupId>com.itways</groupId>
 	<artifactId>common-lib</artifactId>
-	<version>1.0.10</version>
+	<version>1.0.11</version>
 	<packaging>jar</packaging>
 
 	<name>common-lib</name>
@@ -131,6 +131,19 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Optional: only for services that opt in with @EnableForwardedAuth (needs Feign on their classpath). Spring Cloud 2023.0.x ships feign 13.1. -->
+	<dependency>
+		<groupId>io.github.openfeign</groupId>
+		<artifactId>feign-core</artifactId>
+		<version>13.1</version>
+		<optional>true</optional>
+	</dependency>
+	<!-- Optional: only for services that opt in with @EnableAccountAuditing (needs Spring Data JPA on their classpath). -->
+	<dependency>
+		<groupId>org.springframework.data</groupId>
+		<artifactId>spring-data-jpa</artifactId>
+		<optional>true</optional>
+	</dependency>
 	</dependencies>
 
 	<build>

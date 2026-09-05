@@ -20,8 +20,15 @@ public class RedisStore<K, V> implements CacheStore<K, V> {
         this.ttlMinutes = ttlMinutes;
     }
 
+    /**
+     * Every key this library writes lives under {@code nibras:cache:<cacheName>:}, the
+     * same {@code nibras:} namespace the services use for their own keys, so one
+     * {@code KEYS nibras:*} shows everything the platform owns in a shared Redis.
+     */
+    static final String KEY_NAMESPACE = "nibras:cache:";
+
     private String getFullName(K key) {
-        return cacheName + '.' + key.toString();
+        return KEY_NAMESPACE + cacheName + ':' + key.toString();
     }
 
     @Override
@@ -100,7 +107,7 @@ public class RedisStore<K, V> implements CacheStore<K, V> {
     public void clear() {
         if (redisTemplate == null) return;
         try {
-            var keys = redisTemplate.keys(cacheName + ".*");
+            var keys = redisTemplate.keys(KEY_NAMESPACE + cacheName + ":*");
             if (keys != null && !keys.isEmpty()) {
                 redisTemplate.delete(keys);
                 log.info("[Redis] CLEAR cache='{}' — deleted {} keys", cacheName, keys.size());

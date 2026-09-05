@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.config.CacheProperties;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +45,7 @@ class HybridCacheStoreFactoryTest {
     private CacheStore<String, String> ehcacheStore;
 
     private final CacheProperties properties = new CacheProperties();
-    private final CacheConfig config = CacheConfig.defaultConfig();
+    private final CacheSettings config = CacheSettings.defaultConfig();
 
     private HybridCacheStoreFactory factory() {
         return new HybridCacheStoreFactory(ehcacheFactory, redisStoreFactory, redisHealthChecker, properties);

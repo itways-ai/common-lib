@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
 
@@ -15,7 +15,7 @@ public class MemoryStoreFactory implements CacheStoreFactory {
     @SuppressWarnings("unchecked")
     @Override
     public <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType,
-            CacheConfig config) {
+            CacheSettings config) {
         return (CacheStore<K, V>) caches.computeIfAbsent(cacheName, k -> new MemoryStore<K, V>(config));
     }
 
@@ -25,7 +25,7 @@ public class MemoryStoreFactory implements CacheStoreFactory {
         // For in-memory, we create it if it doesn't exist to behave similarly,
         // or we could return null. Given the usage, returning a cache is safer.
         return (CacheStore<String, String>) caches.computeIfAbsent(cacheName,
-                k -> new MemoryStore<String, String>(CacheConfig.defaultConfig()));
+                k -> new MemoryStore<String, String>(CacheSettings.defaultConfig()));
     }
 
     @Override
@@ -34,6 +34,6 @@ public class MemoryStoreFactory implements CacheStoreFactory {
         // properties if we wanted to support it here too.
         // For now, using default config as InMemory is mostly for testing/dev without
         // ehcache.
-        return createCache(cacheName, String.class, String.class, CacheConfig.defaultConfig());
+        return createCache(cacheName, String.class, String.class, CacheSettings.defaultConfig());
     }
 }

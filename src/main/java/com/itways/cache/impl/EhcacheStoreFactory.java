@@ -1,6 +1,6 @@
 package com.itways.cache.impl;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.config.CacheProperties;
@@ -48,7 +48,7 @@ public class EhcacheStoreFactory implements CacheStoreFactory {
 
     @Override
     public <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType,
-            CacheConfig config) {
+            CacheSettings config) {
         // Check if cache already exists to avoid exceptions
         Cache<K, V> existingCache = cacheManager.getCache(cacheName, keyType, valueType);
         if (existingCache != null) {
@@ -75,9 +75,9 @@ public class EhcacheStoreFactory implements CacheStoreFactory {
 
     @Override
     public CacheStore<String, String> createCache(String cacheName) {
-        CacheConfig config = properties.getCaches().get(cacheName);
+        CacheSettings config = properties.getCaches().get(cacheName);
         if (config == null) {
-            config = CacheConfig.builder()
+            config = CacheSettings.builder()
                     .name(cacheName)
                     .ttlMinutes(properties.getEhcache().getTtlMinutes())
                     .heapSize(properties.getEhcache().getHeapSize())

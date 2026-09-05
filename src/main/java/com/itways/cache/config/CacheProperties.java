@@ -3,7 +3,7 @@ package com.itways.cache.config;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import com.itways.cache.CacheConfig;
+import com.itways.cache.CacheSettings;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,5 +55,5 @@ public class CacheProperties {
     /**
      * Map of cache configurations
      */
-    private Map<String, CacheConfig> caches = new HashMap<>();
+    private Map<String, CacheSettings> caches = new HashMap<>();
 }

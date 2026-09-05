@@ -11,7 +11,7 @@ public interface CacheStoreFactory {
      * @param config    Configuration for this specific cache
      * @return CacheStore instance
      */
-    <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType, CacheConfig config);
+    <K, V> CacheStore<K, V> createCache(String cacheName, Class<K> keyType, Class<V> valueType, CacheSettings config);
 
     /**
      * Retrieve an existing cache instance
