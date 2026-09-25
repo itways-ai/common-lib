@@ -22,6 +22,15 @@ public class JwtTokenProvider {
     @Value("${jwt.rsa.private-key:}")
     private String privateKeyStr;
 
+    /** Claim naming what a token is for; absent on a user access token. */
+    public static final String CLAIM_TYPE = "type";
+
+    /** A refresh token: good only for minting a new access token, never for an API call. */
+    public static final String TYPE_REFRESH = "REFRESH";
+
+    /** What a token with no {@link #CLAIM_TYPE} is: an ordinary user access token. */
+    public static final String TYPE_ACCESS = "ACCESS";
+
     @Value("${jwt.rsa.public-key:}")
     private String publicKeyStr;
 
@@ -102,7 +111,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(username)
-                .claim("type", "REFRESH")
+                .claim(CLAIM_TYPE, TYPE_REFRESH)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(requireSigningKey(), Jwts.SIG.RS256)
@@ -134,6 +143,25 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload()
                 .get("accE", String.class);
+    }
+
+    /**
+     * The {@code type} claim, or {@code null} on a token that carries none.
+     *
+     * <p>
+     * A user access token sets no type; a refresh token sets {@link #TYPE_REFRESH};
+     * a channel webhook token sets {@code CHANNEL_WEBHOOK}. Callers that accept a
+     * bearer token for an API call must know which of those they were handed —
+     * the three are otherwise indistinguishable, because all of them carry the
+     * same tenant binding.
+     */
+    public String getTokenType(String token) {
+        return Jwts.parser()
+                .verifyWith(publicKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get(CLAIM_TYPE, String.class);
     }
 
     public boolean validateToken(String token) {

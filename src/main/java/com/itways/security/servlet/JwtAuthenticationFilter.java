@@ -35,6 +35,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		String jwt = getJwtFromRequest(request);
 
 		if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+			String tokenType = null;
+			try {
+				tokenType = tokenProvider.getTokenType(jwt);
+			} catch (Exception e) {
+				logger.error("Failed to read the token type: " + e.getMessage());
+			}
+
+			// A refresh token carries the same tenant binding as an access token
+			// and a much longer life, so without this check a leaked one is a
+			// week-long API session. It is good for /refresh-token and nothing
+			// else. A null type is a user access token; CHANNEL_WEBHOOK is a
+			// webhook's own token, which services forward to each other on
+			// purpose (see ForwardedAuthFeignConfig) and must still be accepted.
+			if (JwtTokenProvider.TYPE_REFRESH.equals(tokenType)) {
+				logger.warn("Refresh token presented as a bearer credential — rejecting request");
+				SecurityContextHolder.clearContext();
+				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+				response.setContentType("application/json");
+				response.getWriter().write("{\"success\":false,\"message\":\"Invalid token: wrong token type\"}");
+				return;
+			}
+
 			String username = null;
 			String accountId = null;
 			try {
@@ -74,8 +96,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 					userDetails, null, userDetails.getAuthorities());
 
-			// Set accountId in details for resolver to pick up
-			authentication.setDetails(Map.of("accountId", accountId, "remoteAddress", request.getRemoteAddr()));
+			// accountId for the resolver to pick up; tokenType so a service can
+			// refuse a credential that is merely valid — a webhook token is
+			// still the whole tenant, so anything destructive should look.
+			authentication.setDetails(Map.of(
+					"accountId", accountId,
+					"tokenType", tokenType == null ? JwtTokenProvider.TYPE_ACCESS : tokenType,
+					"remoteAddress", String.valueOf(request.getRemoteAddr())));
 
 			SecurityContextHolder.getContext().setAuthentication(authentication);
 		}
