@@ -10,9 +10,17 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * {@code limit} is how many survive to reach the model. It is the caller's
  * choice because the caller knows what it can afford to put in a prompt; null
  * means journey-service's default.
+ * @param embeddingModel which model made the vector (e.g. granite-embedding:278m); null when the
+ *                       caller did not say, which journey-service treats as unknown
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record IntentShortlistRequest(
         float[] queryVector,
-        Integer limit) {
+        Integer limit,
+        String embeddingModel) {
+
+    /** Without the model — every stored vector is a candidate, whichever model made it. */
+    public IntentShortlistRequest(float[] queryVector, Integer limit) {
+        this(queryVector, limit, null);
+    }
 }

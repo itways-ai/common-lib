@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.Map;
 
@@ -14,8 +15,12 @@ import java.util.Map;
 public class NotificationRequest {
     private String recipient;
     private String subject;
+    /** Carries sign-in codes and reset links: never printed. */
+    @ToString.Exclude
     private String body;
     private Map<String, Object> metadata;
+    /** A tenant's SMTP settings, password included: never printed. */
+    @ToString.Exclude
     private EmailProviderConfig providerConfig;
     private String type; // EMAIL, SMS, PUSH
 

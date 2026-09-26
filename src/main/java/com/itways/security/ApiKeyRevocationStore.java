@@ -11,23 +11,23 @@ import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Redis-backed deny-list for revoked API keys, shared by every service that
- * accepts {@code X-API-KEY}.
+ * Redis-backed deny-list for revoked API keys — superseded by the allow-list in
+ * {@link ApiKeyStatusStore} and no longer consulted by
+ * {@code ApiKeyAuthenticationFilter}.
  *
- * <p>Write side: account-service calls {@link #revoke} when a key's status is
- * flipped to REVOKED, storing {@code nibras:apikeys:revoked:<keyHash>} with a
- * TTL matching the key's remaining life (no TTL when the key never expires).
+ * <p>Why it was replaced (AS-08): a deny-list fails open. Losing a Redis entry
+ * (eviction, restart without persistence) resurrected the revoked key, and the
+ * 60s "not revoked" verdict cache kept a freshly revoked key working on other
+ * services for up to a minute.
  *
- * <p>Read side: {@link ApiKeyAuthenticationFilter} calls {@link #isRevoked}
- * per request. A small in-memory verdict cache (60s) keeps the hot path to one
- * Redis round-trip per key per minute — which also bounds how long a freshly
- * revoked key keeps working on a warm instance.
+ * <p>Kept only so account-service compiles until it switches to
+ * {@link ApiKeyStatusStore#deactivate}; writes here have no effect on
+ * authentication any more.
  *
- * <p>Availability over lockout (pre-production posture, deliberate): when
- * Redis is unreachable the check logs a WARN and ALLOWS the key rather than
- * failing every API-key request in the platform. Flip this to fail-closed
- * before any real production exposure.
+ * @deprecated use {@link ApiKeyStatusStore}: {@code activate} on create,
+ *             {@code deactivate} on revoke.
  */
+@Deprecated(forRemoval = true)
 @Component
 @Slf4j
 public class ApiKeyRevocationStore {
@@ -79,8 +79,8 @@ public class ApiKeyRevocationStore {
     /**
      * Whether the key hash is on the deny-list. Verdicts are cached in-memory
      * for {@value #VERDICT_TTL_MILLIS} ms; when Redis is unreachable the
-     * answer is {@code false} (allow) — availability over lockout, see class
-     * javadoc.
+     * answer is {@code false} (allow) — the fail-open behaviour that got this
+     * class replaced by {@link ApiKeyStatusStore#isActive}.
      */
     public boolean isRevoked(String keyHash) {
         if (keyHash == null || keyHash.isBlank()) {

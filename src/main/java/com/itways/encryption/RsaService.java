@@ -125,7 +125,9 @@ public class RsaService implements EncryptionService {
             byte[] decryptedBytes = cipher.doFinal(decodedBytes);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            log.error("Error decrypting data", e);
+            // Usually a client sending a value that was not encrypted with our key: callers
+            // answer 400. One line, no stack trace, never the ciphertext.
+            log.warn("RSA decryption failed ({})", e.getClass().getSimpleName());
             throw new RuntimeException("Error decrypting data", e);
         }
     }

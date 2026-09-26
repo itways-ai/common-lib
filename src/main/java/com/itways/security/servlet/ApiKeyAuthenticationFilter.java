@@ -1,7 +1,7 @@
 package com.itways.security.servlet;
 
 import com.itways.security.ApiKeyProvider;
-import com.itways.security.ApiKeyRevocationStore;
+import com.itways.security.ApiKeyStatusStore;
 import com.itways.security.SecurityUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,7 +27,7 @@ import java.util.Map;
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
     private final ApiKeyProvider apiKeyProvider;
-    private final ApiKeyRevocationStore revocationStore;
+    private final ApiKeyStatusStore apiKeyStatusStore;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -59,8 +59,14 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                     accountId = null;
                 }
 
-                if (accountId != null && revocationStore.isRevoked(SecurityUtils.hash(apiKey))) {
-                    logger.warn("API Key is on the revocation deny-list — refusing to authenticate");
+                // Allow-list, not deny-list (AS-08): a key works only while
+                // account-service keeps it listed as active, so a revoked key
+                // stays dead even if Redis loses its data. Unreachable store →
+                // refused (fail closed).
+                String keyHash = SecurityUtils.hash(apiKey);
+                if (accountId != null && !apiKeyStatusStore.isActive(keyHash)) {
+                    logger.warn("API Key is not on the active allow-list (revoked, unknown, or store unreachable)"
+                            + " — refusing to authenticate");
                     accountId = null;
                 }
 
@@ -77,6 +83,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                             "authSource", "API_KEY"));
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    apiKeyStatusStore.recordUse(keyHash);
                     logger.debug("Successfully authenticated via API Key for user: " + username);
                 }
             } catch (Exception ex) {

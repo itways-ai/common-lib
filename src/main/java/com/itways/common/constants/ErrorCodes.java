@@ -15,6 +15,8 @@ public class ErrorCodes {
     public static final String INTERNAL_ERROR = "SYS_001";
     public static final String UNAUTHORIZED = "AUTH_401";
     public static final String FORBIDDEN = "AUTH_403";
+    /** An access token issued before the account's last password change. */
+    public static final String TOKEN_REVOKED = "AUTH_TOKEN_REVOKED";
     public static final String ACCOUNT_LOCKED = "AUTH_008";
     public static final String CAPTCHA_INVALID = "AUTH_009";
     public static final String EXTERNAL_SERVICE_ERROR = "SYS_002";
