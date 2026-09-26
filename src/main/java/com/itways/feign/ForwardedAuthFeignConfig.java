@@ -1,10 +1,13 @@
 package com.itways.feign;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.itways.security.internal.InternalServiceToken;
 
 import feign.RequestInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +24,12 @@ import lombok.extern.slf4j.Slf4j;
  * registering a {@link ForwardedAuthorizationResolver}.
  *
  * <p>
+ * When {@code itways.internal-token} is set, every call also carries it as
+ * {@code X-Service-Token}, so the service called can tell a platform service
+ * from any other caller on its internal routes ({@link InternalServiceToken}).
+ * It is sent even without a current request (scheduled jobs, consumers).
+ *
+ * <p>
  * Opt in with {@code @EnableForwardedAuth}; the class is not auto-configured,
  * because a service without Feign has no {@code RequestInterceptor} to give.
  */
@@ -29,8 +38,13 @@ import lombok.extern.slf4j.Slf4j;
 public class ForwardedAuthFeignConfig {
 
 	@Bean
-	public RequestInterceptor forwardedAuthRequestInterceptor(ObjectProvider<ForwardedAuthorizationResolver> fallback) {
+	public RequestInterceptor forwardedAuthRequestInterceptor(ObjectProvider<ForwardedAuthorizationResolver> fallback,
+			@Value("${itways.internal-token:}") String internalToken) {
+		String serviceToken = internalToken == null ? "" : internalToken.trim();
 		return template -> {
+			if (!serviceToken.isEmpty()) {
+				template.header(InternalServiceToken.HEADER, serviceToken);
+			}
 			ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
 			if (attributes == null || attributes.getRequest() == null) {
 				return;
