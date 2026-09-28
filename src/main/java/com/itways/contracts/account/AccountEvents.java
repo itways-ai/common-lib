@@ -9,10 +9,11 @@ package com.itways.contracts.account;
  * One durable topic exchange, {@value #EXCHANGE}; the routing key names the
  * change. Messages are JSON: {@link AiConfigChanged} for
  * {@value #AI_CONFIG_CHANGED}, {@link AssistantChanged} for every
- * {@code assistant.*} key. A consumer binds its own queue with the keys it
- * cares about ({@code assistant.*} for all assistant changes). Delivery is
- * best-effort, after the change has committed: treat an event as a hint to
- * refresh, not as the only way to learn about a change.
+ * {@code assistant.*} key, {@link AccountDeleted} for {@value #ACCOUNT_DELETED}.
+ * A consumer binds its own queue with the keys it cares about
+ * ({@code assistant.*} for all assistant changes). Delivery is best-effort,
+ * after the change has committed: treat an event as a hint to refresh, not as
+ * the only way to learn about a change.
  */
 public final class AccountEvents {
 
@@ -28,6 +29,13 @@ public final class AccountEvents {
     public static final String ASSISTANT_ENABLED = "assistant.enabled";
     /** Gone: journeys and channels that still point at it are orphaned. */
     public static final String ASSISTANT_DELETED = "assistant.deleted";
+
+    /**
+     * The whole account was deleted: delete everything kept for it. Implies the
+     * deletion of all its assistants, which get no {@code assistant.deleted} of
+     * their own.
+     */
+    public static final String ACCOUNT_DELETED = "account.deleted";
 
     private AccountEvents() {
     }

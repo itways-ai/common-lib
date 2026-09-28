@@ -35,9 +35,15 @@ public class ChannelRuntimeView {
 
 	private UUID id;
 	private String accountId;
-	/** Owning assistant — the tamper-proof source of a conversation's scope; null means the account default. */
+	/**
+	 * The assistant the channel answers as: the tamper-proof source of a
+	 * conversation's scope. Every channel has exactly one and it is never
+	 * shared. Null only on a channel older than that rule whose account had no
+	 * default assistant to give it; the runtime answers on such a channel as the
+	 * account's default assistant if there is one by now, and not at all
+	 * otherwise. A disabled or deleted assistant's channel does not answer.
+	 */
 	private UUID assistantId;
-	private String username;
 	private String label;
 	private String type;
 	private String status;

@@ -38,4 +38,18 @@ public class TemplateVariable {
         example = "[\"user.name\", \"user.email\"]"
     )
     private List<String> paths;
+
+    @Schema(
+        description = "True when the template copes with the value being absent: every use has a " +
+                      "default (x!, x!\"...\", (x.y)!), is an existence test (x??, x?has_content, " +
+                      "x?default(...)), or sits inside <#if x??> / <#if x?has_content>. " +
+                      "One unguarded use makes it required. Missing in older answers means required.",
+        example = "false"
+    )
+    private boolean optional;
+
+    /** A required variable: the shape every caller used before {@code optional} existed. */
+    public TemplateVariable(String name, String kind, List<String> paths) {
+        this(name, kind, paths, false);
+    }
 }
