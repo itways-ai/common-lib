@@ -1,6 +1,7 @@
 package com.itways.cache.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.impl.EhcacheStoreFactory;
@@ -12,7 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -73,9 +74,30 @@ public class CacheProviderConfig {
         return new HybridCacheStoreFactory(ehcacheStoreFactory, redisStoreFactory, redisHealthChecker, cacheProperties);
     }
 
+    /**
+     * The Spring {@link CacheManager} behind {@code @Cacheable}, unless the
+     * service declares its own (PLT-22).
+     *
+     * <p>
+     * It used to be an unbounded {@code ConcurrentMapCacheManager}: entries
+     * never expired and a cache keyed by user input grew until the heap ran
+     * out. Now every cache it creates is a Caffeine cache capped at
+     * {@code itways.cache.manager.maximum-size} entries (default 10000) that
+     * drops an entry {@code itways.cache.manager.ttl} after it was written
+     * (default 10 minutes). Caches are still created on first use, under any
+     * name. The {@link CacheStoreFactory} stores (Ehcache, Redis, hybrid) are
+     * separate and unchanged.
+     */
     @Bean
     @ConditionalOnMissingBean
-    public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager();
+    public CacheManager cacheManager(CacheProperties cacheProperties) {
+        CacheProperties.ManagerProperties settings = cacheProperties.getManager();
+        CaffeineCacheManager manager = new CaffeineCacheManager();
+        manager.setCaffeine(Caffeine.newBuilder()
+                .maximumSize(settings.getMaximumSize())
+                .expireAfterWrite(settings.getTtl()));
+        // Same as the previous manager: a method returning null is cached too.
+        manager.setAllowNullValues(true);
+        return manager;
     }
 }
