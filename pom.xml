@@ -30,6 +30,15 @@
 
 	<dependencyManagement>
 		<dependencies>
+			<!-- Before Spring Boot's BOM: Boot 3.2 pins Testcontainers 1.19, whose Docker API
+			     version Docker 29 refuses (test scope only, for ActivityOutboxIT). -->
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>1.21.4</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 			<dependency>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-dependencies</artifactId>
@@ -118,6 +127,12 @@
 
 
 
+		<!-- Bounded default CacheManager for @Cacheable (PLT-22); version from Spring Boot's BOM. -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
 		<!-- Ehcache for MFA Replay Protection -->
 		<dependency>
 			<groupId>org.ehcache</groupId>
@@ -125,10 +140,54 @@
 			<version>3.10.8</version>
 		</dependency>
 
+		<!-- Instants in the activity outbox's stored JSON (PLT-07); version from Spring Boot's BOM. -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+		</dependency>
+
+		<!-- Optional: the activity outbox's health indicator and gauges, where the service has Actuator. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-actuator</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+			<optional>true</optional>
+		</dependency>
+
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- ActivityOutboxIT: the outbox against a real Postgres and RabbitMQ. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>rabbitmq</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<!-- Optional: only for services that opt in with @EnableForwardedAuth (needs Feign on their classpath). Spring Cloud 2023.0.x ships feign 13.1. -->
@@ -142,6 +201,12 @@
 	<dependency>
 		<groupId>org.springframework.data</groupId>
 		<artifactId>spring-data-jpa</artifactId>
+		<optional>true</optional>
+	</dependency>
+	<!-- Optional: only for services that opt in with @EnableAssistantScope (reads the assistant_directory view). -->
+	<dependency>
+		<groupId>org.springframework</groupId>
+		<artifactId>spring-jdbc</artifactId>
 		<optional>true</optional>
 	</dependency>
 	</dependencies>
@@ -169,6 +234,49 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
+			</plugin>
+			<!-- *IT classes (Testcontainers) run in `mvn verify`. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<version>3.1.2</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<!--
+				The security-core classifier jar: com.itways.security.core (TokenVerifier,
+				ApiKeyCodec, CredentialCrypto, PublicKeys) and the one constants class it reads,
+				nothing else. No Spring, servlet or MVC classes, no auto-configuration imports and
+				no application.properties, so a WebFlux application (the api-gateway) can use the
+				platform's credential rules. Consumers exclude this pom's transitive dependencies
+				and declare jjwt themselves; see package-info in com.itways.security.core.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.3.0</version>
+				<executions>
+					<execution>
+						<id>security-core</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<configuration>
+							<classifier>security-core</classifier>
+							<includes>
+								<include>com/itways/security/core/**</include>
+								<include>com/itways/contracts/channels/ChannelWebhookTokenClaims.class</include>
+							</includes>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
