@@ -1,30 +1,34 @@
 package com.itways.security;
 
 import com.itways.common.exception.InvalidApiKeyException;
+import com.itways.security.core.ApiKeyCodec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * Reads {@code X-API-KEY} values with the key {@link SecurityUtils} is
+ * configured with. The format and the rules are {@link ApiKeyCodec}'s, shared
+ * with the api-gateway.
+ */
 @Component
 @Slf4j
 public class ApiKeyProvider {
-    private static final String PREFIX = "sk_live_";
-    private static final String SEPARATOR = "::";
 
     public String getUsernameFromApiKey(String apiKey) {
-        return getParts(apiKey)[2];
+        return getPayload(apiKey).username();
     }
 
     public String getAccountIdHashedFromApiKey(String apiKey) {
-        return getParts(apiKey)[0];
+        return getPayload(apiKey).accountIdHash();
     }
 
     public String getAccountIdEncryptedFromApiKey(String apiKey) {
-        return getParts(apiKey)[1];
+        return getPayload(apiKey).accountIdEncrypted();
     }
 
     public int getKeyVersion(String apiKey) {
         try {
-            return Integer.parseInt(getParts(apiKey)[3]);
+            return getPayload(apiKey).keyVersion();
         } catch (Exception e) {
             return 0;
         }
@@ -37,27 +41,38 @@ public class ApiKeyProvider {
      */
     public long getExpiresAtEpochMillis(String apiKey) {
         try {
-            return Long.parseLong(getParts(apiKey)[4]);
+            return getPayload(apiKey).expiresAtEpochMillis();
         } catch (Exception e) {
             return 0L;
         }
     }
 
-    private String[] getParts(String apiKey) {
-        if (apiKey == null || !apiKey.startsWith(PREFIX)) {
+    /**
+     * The whole format check ({@link ApiKeyCodec#check}): decrypts, account
+     * binding, embedded expiry against the system clock. Not the Redis
+     * allow-list, which {@link ApiKeyStatusStore} answers.
+     *
+     * @throws RuntimeException when the encryption key is not configured
+     */
+    public ApiKeyCodec.Result check(String apiKey) {
+        return codec().check(apiKey, System.currentTimeMillis());
+    }
+
+    private ApiKeyCodec.Payload getPayload(String apiKey) {
+        if (!ApiKeyCodec.hasPrefix(apiKey)) {
             throw new InvalidApiKeyException("Invalid API Key format");
         }
         try {
-            String encryptedB64 = apiKey.substring(PREFIX.length());
-            String decrypted = SecurityUtils.decrypt(encryptedB64);
-            if (decrypted == null) {
-                throw new InvalidApiKeyException();
-            }
             // Parts: accHash :: accEnc :: userEnc :: keyVersion :: expiresAtEpochMillis :: padding
-            return decrypted.split(SEPARATOR);
+            return codec().decode(apiKey);
         } catch (Exception e) {
             log.error("Failed to parse API key");
             throw new InvalidApiKeyException();
         }
+    }
+
+    /** Built per call: the key is static in {@link SecurityUtils} and may be set again (tests). */
+    private static ApiKeyCodec codec() {
+        return new ApiKeyCodec(SecurityUtils.encryptionKey());
     }
 }

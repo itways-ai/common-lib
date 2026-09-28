@@ -1,47 +1,57 @@
 package com.itways.security.jwt;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.LocatorAdapter;
-import io.jsonwebtoken.ProtectedHeader;
-import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import java.security.Key;
 import java.security.KeyFactory;
-import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 
-import com.itways.contracts.channels.ChannelWebhookTokenClaims;
+import com.itways.security.core.PublicKeys;
+import com.itways.security.core.TokenVerifier;
 
 @Component
 @Slf4j
 public class JwtTokenProvider {
 
+    /** The variable that holds the platform's token verification key. */
+    public static final String PUBLIC_KEY_ENV = "RSA_PUBLIC_KEY";
+    static final String PRIVATE_KEY_ENV = "RSA_PRIVATE_KEY";
+    static final String WEBHOOK_PUBLIC_KEY_ENV = "CHANNEL_WEBHOOK_PUBLIC_KEY";
+    static final String WEBHOOK_PREVIOUS_PUBLIC_KEY_ENV = "CHANNEL_WEBHOOK_PUBLIC_KEY_PREVIOUS";
+
+    /** Only auth-service signs; everywhere else this is empty. */
     @Value("${jwt.rsa.private-key:}")
     private String privateKeyStr;
 
     /** Claim naming what a token is for; absent on a user access token. */
-    public static final String CLAIM_TYPE = "type";
+    public static final String CLAIM_TYPE = TokenVerifier.CLAIM_TYPE;
 
     /** A refresh token: good only for minting a new access token, never for an API call. */
-    public static final String TYPE_REFRESH = "REFRESH";
+    public static final String TYPE_REFRESH = TokenVerifier.TYPE_REFRESH;
 
     /** What a token with no {@link #CLAIM_TYPE} is: an ordinary user access token. */
-    public static final String TYPE_ACCESS = "ACCESS";
+    public static final String TYPE_ACCESS = TokenVerifier.TYPE_ACCESS;
 
-    @Value("${jwt.rsa.public-key:}")
+    /**
+     * The sign-in session a token belongs to. auth-service puts it in refresh
+     * tokens and, since PLT-05, in user access tokens, so signing out ends the
+     * session's access tokens too ({@code SessionRevocationStore}). Access
+     * tokens minted before that carry none.
+     */
+    public static final String CLAIM_SESSION_ID = "sid";
+
+    /** Required: the platform's token verification key. */
+    @Value("${jwt.rsa.public-key:${RSA_PUBLIC_KEY:}}")
     private String publicKeyStr;
 
     /**
@@ -52,6 +62,16 @@ public class JwtTokenProvider {
     @Value("${jwt.channel-webhook.public-key:${CHANNEL_WEBHOOK_PUBLIC_KEY:}}")
     private String webhookPublicKeyStr;
 
+    /**
+     * The webhook key being retired during a rotation
+     * ({@code CHANNEL_WEBHOOK_PUBLIC_KEY_PREVIOUS}, optional). A webhook token
+     * that does not verify with the current key is tried with this one, so the
+     * URLs already registered with Telegram and Twilio keep working until each
+     * channel's URL is rotated. Remove it once they all are (CHN-12).
+     */
+    @Value("${jwt.channel-webhook.previous-public-key:${CHANNEL_WEBHOOK_PUBLIC_KEY_PREVIOUS:}}")
+    private String webhookPreviousPublicKeyStr;
+
     @Value("${jwt.access-expiration:3600000}") // 1 hour
     private long accessExpiration;
 
@@ -61,31 +81,54 @@ public class JwtTokenProvider {
     private PrivateKey privateKey;
     private PublicKey publicKey;
     private PublicKey webhookPublicKey;
+    private PublicKey webhookPreviousPublicKey;
+    private TokenVerifier verifier;
 
+    /**
+     * Loads the keys and fails the startup when they are missing or broken.
+     *
+     * <p>
+     * This bean exists only in services that verify JWTs (those that use
+     * {@code @EnableCustomSecurity}), and such a service cannot do its job
+     * without the platform's public key: it used to generate a throwaway key
+     * pair instead, so it started, looked healthy and refused every real
+     * token, including the channel webhook tokens (CH-15). Now it refuses to
+     * start and names the variable to set. A service without this bean
+     * (notification-service) needs none of these keys.
+     *
+     * <p>
+     * {@code CHANNEL_WEBHOOK_PUBLIC_KEY} stays optional: without it a webhook
+     * token is verified with the platform key, which is what channels-service
+     * signs with when it has no dedicated webhook key. A value that is set but
+     * is not a key fails the startup like a broken {@code RSA_PUBLIC_KEY}.
+     */
     @PostConstruct
-    public void init() throws Exception {
-        boolean hasPrivate = privateKeyStr != null && !privateKeyStr.isEmpty();
-        boolean hasPublic = publicKeyStr != null && !publicKeyStr.isEmpty();
+    public void init() {
+        this.publicKey = PublicKeys.fromConfig(PUBLIC_KEY_ENV, publicKeyStr);
+        if (this.publicKey == null) {
+            throw new IllegalStateException(PUBLIC_KEY_ENV + " (jwt.rsa.public-key) is not configured. This service"
+                    + " verifies JWTs and cannot start without the platform's RSA public key: set "
+                    + PUBLIC_KEY_ENV + " to the Base64 X.509 public key that auth-service's tokens are signed for"
+                    + " (see .env.example).");
+        }
+        // Verify-only is a first-class mode: only auth-service signs tokens, so
+        // every other service is configured with just the public key and never
+        // sees the private key.
+        this.privateKey = loadPrivateKey(privateKeyStr);
 
-        if (hasPublic) {
-            // Verify-only is a first-class mode: only auth-service signs
-            // tokens, so every other service is configured with just the
-            // public key and never sees the private key.
-            this.publicKey = loadPublicKey(publicKeyStr);
-            this.privateKey = hasPrivate ? loadPrivateKey(privateKeyStr) : null;
-        } else if (hasPrivate) {
+        this.webhookPublicKey = PublicKeys.fromConfig(WEBHOOK_PUBLIC_KEY_ENV, webhookPublicKeyStr);
+        this.webhookPreviousPublicKey = PublicKeys.fromConfig(WEBHOOK_PREVIOUS_PUBLIC_KEY_ENV,
+                webhookPreviousPublicKeyStr);
+        if (webhookPreviousPublicKey != null && webhookPublicKey == null) {
             throw new IllegalStateException(
-                    "jwt.rsa.private-key is set but jwt.rsa.public-key is not — configure the public key too");
-        } else {
-            // Generate for development if not provided
-            KeyPair keyPair = Keys.keyPairFor(io.jsonwebtoken.SignatureAlgorithm.RS512);
-            this.privateKey = keyPair.getPrivate();
-            this.publicKey = keyPair.getPublic();
-            System.out.println("DEBUG: Generated temporary RSA keys for JWT.");
+                    WEBHOOK_PREVIOUS_PUBLIC_KEY_ENV + " is set but " + WEBHOOK_PUBLIC_KEY_ENV + " is not");
         }
-        if (webhookPublicKeyStr != null && !webhookPublicKeyStr.isBlank()) {
-            this.webhookPublicKey = loadPublicKey(webhookPublicKeyStr.trim());
+        if (webhookPublicKey == null) {
+            log.info("{} is not set: channel webhook tokens are verified with the platform key ({})",
+                    WEBHOOK_PUBLIC_KEY_ENV, PUBLIC_KEY_ENV);
         }
+        // jjwt's own clock, as before the rules moved to TokenVerifier.
+        this.verifier = new TokenVerifier(publicKey, webhookPublicKey, webhookPreviousPublicKey, null);
     }
 
     /**
@@ -97,37 +140,13 @@ public class JwtTokenProvider {
      * access and refresh tokens carry none) the platform key. Two rules keep
      * the keys apart: a token signed with the webhook key is only ever a
      * webhook credential, and once the webhook key is configured a webhook
-     * credential signed with the platform key is refused.
+     * credential signed with the platform key is refused. The rules are
+     * {@link TokenVerifier}'s, shared with the api-gateway.
      *
-     * @throws JwtException when the signature, expiry or key rules fail
+     * @throws io.jsonwebtoken.JwtException when the signature, expiry or key rules fail
      */
     public Claims getVerifiedClaims(String token) {
-        boolean[] webhookKeyUsed = { false };
-        Claims claims = Jwts.parser()
-                .keyLocator(new LocatorAdapter<Key>() {
-                    @Override
-                    protected Key locate(ProtectedHeader header) {
-                        if (ChannelWebhookTokenClaims.KEY_ID.equals(header.getKeyId())) {
-                            if (webhookPublicKey == null) {
-                                throw new JwtException("Token signed with the webhook key, which is not configured here");
-                            }
-                            webhookKeyUsed[0] = true;
-                            return webhookPublicKey;
-                        }
-                        return publicKey;
-                    }
-                })
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-        boolean webhookType = ChannelWebhookTokenClaims.TYPE_CHANNEL_WEBHOOK.equals(claims.get(CLAIM_TYPE, String.class));
-        if (webhookKeyUsed[0] && !webhookType) {
-            throw new JwtException("Only a channel webhook token may be signed with the webhook key");
-        }
-        if (webhookType && webhookPublicKey != null && !webhookKeyUsed[0]) {
-            throw new JwtException("Channel webhook tokens must be signed with the webhook key");
-        }
-        return claims;
+        return verifier.verify(token);
     }
 
     private PrivateKey requireSigningKey() {
@@ -138,18 +157,19 @@ public class JwtTokenProvider {
         return privateKey;
     }
 
-    private PrivateKey loadPrivateKey(String key) throws Exception {
-        byte[] keyBytes = Base64.getDecoder().decode(key);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(spec);
-    }
-
-    private PublicKey loadPublicKey(String key) throws Exception {
-        byte[] keyBytes = Base64.getDecoder().decode(key);
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePublic(spec);
+    /** {@code null} when not configured; a set value that is not a key fails, naming the variable. */
+    private static PrivateKey loadPrivateKey(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] keyBytes = Base64.getDecoder().decode(key.replaceAll("\\s", ""));
+            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+        } catch (Exception e) {
+            // The exception class only: a message could quote key material.
+            throw new IllegalStateException(PRIVATE_KEY_ENV + " (jwt.rsa.private-key) is set but is not a Base64"
+                    + " PKCS#8 RSA private key (" + e.getClass().getSimpleName() + ")");
+        }
     }
 
     public String generateToken(String username, String role) {
@@ -221,6 +241,12 @@ public class JwtTokenProvider {
         Date issuedAt = getVerifiedClaims(token)
                 .getIssuedAt();
         return issuedAt != null ? issuedAt.toInstant() : null;
+    }
+
+    /** The verified {@link #CLAIM_SESSION_ID} claim, or {@code null} on a token that carries none. */
+    public String getSessionId(String token) {
+        return getVerifiedClaims(token)
+                .get(CLAIM_SESSION_ID, String.class);
     }
 
     public boolean validateToken(String token) {

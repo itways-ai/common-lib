@@ -3,6 +3,7 @@ package com.itways.security.servlet;
 import com.itways.security.ApiKeyProvider;
 import com.itways.security.ApiKeyStatusStore;
 import com.itways.security.SecurityUtils;
+import com.itways.security.core.ApiKeyCodec;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,26 +38,17 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(apiKey)) {
             try {
-                String username = apiKeyProvider.getUsernameFromApiKey(apiKey);
-                String accHash = apiKeyProvider.getAccountIdHashedFromApiKey(apiKey);
-                String accEnc = apiKeyProvider.getAccountIdEncryptedFromApiKey(apiKey);
-                int keyVersion = apiKeyProvider.getKeyVersion(apiKey);
+                // Decryption, account binding and embedded expiry: ApiKeyCodec's
+                // rules, the same code the api-gateway runs at the edge.
+                ApiKeyCodec.Result check = apiKeyProvider.check(apiKey);
 
                 String accountId = null;
-                try {
-                    String decryptedAccount = SecurityUtils.decrypt(accEnc);
-                    String hashedAccount = SecurityUtils.hash(decryptedAccount);
-
-                    if (hashedAccount.equals(accHash)) {
-                        accountId = decryptedAccount;
-                    }
-                } catch (Exception ex) {
-                    logger.error("API Key decryption or hash validation failed: " + ex.getMessage());
-                }
-
-                if (accountId != null && isExpired(apiKey)) {
+                if (check.status() == ApiKeyCodec.Status.INVALID) {
+                    logger.error("API Key decryption or hash validation failed");
+                } else if (check.status() == ApiKeyCodec.Status.EXPIRED) {
                     logger.warn("API Key is past its embedded expiry — refusing to authenticate");
-                    accountId = null;
+                } else {
+                    accountId = check.accountId();
                 }
 
                 // Allow-list, not deny-list (AS-08): a key works only while
@@ -71,6 +63,9 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 if (accountId != null) {
+                    String username = check.payload().username();
+                    int keyVersion = check.payload().keyVersion();
+
                     // Validated identity
                     UserDetails userDetails = new User(username, "", Collections.emptyList());
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -92,10 +87,5 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private boolean isExpired(String apiKey) {
-        long expiresAtMillis = apiKeyProvider.getExpiresAtEpochMillis(apiKey);
-        return expiresAtMillis > 0 && expiresAtMillis <= System.currentTimeMillis();
     }
 }

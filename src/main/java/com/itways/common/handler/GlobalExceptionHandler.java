@@ -3,6 +3,7 @@ package com.itways.common.handler;
 import com.itways.common.constants.ErrorCodes;
 import com.itways.common.exception.BusinessException;
 import com.itways.common.response.ApiResponse;
+import com.itways.security.core.SecurityMessages;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -185,12 +186,12 @@ public class GlobalExceptionHandler {
     /** Method security ({@code @PreAuthorize}) denials: were a 500 with the message. */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
-        return error(HttpStatus.FORBIDDEN, "Access denied", ErrorCodes.FORBIDDEN);
+        return error(HttpStatus.FORBIDDEN, SecurityMessages.PERMISSION_DENIED, ErrorCodes.FORBIDDEN);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<Void>> handleAuthentication(AuthenticationException ex) {
-        return error(HttpStatus.UNAUTHORIZED, "Authentication required", ErrorCodes.UNAUTHORIZED);
+        return error(HttpStatus.UNAUTHORIZED, SecurityMessages.AUTHENTICATION_REQUIRED, ErrorCodes.UNAUTHORIZED);
     }
 
     // ── Fallback ───────────────────────────────────────────────────────────────

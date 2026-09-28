@@ -9,6 +9,7 @@ import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.CredentialsExpiredException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
@@ -25,6 +26,7 @@ import com.itways.security.SecurityUtils;
 import com.itways.security.SessionRevocationStore;
 import com.itways.security.jwt.JwtTokenProvider;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,26 +38,29 @@ import lombok.RequiredArgsConstructor;
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-	static final String TOKEN_REVOKED_MESSAGE = "Your session ended because the password was changed. Please sign in again.";
+	/**
+	 * The answer to a revoked access token (sign-out, password change,
+	 * deactivation): 401 {@code AUTH_401}, like any other missing credential, so
+	 * the portal tries its refresh token and, the session being over, signs out.
+	 */
+	static final String SESSION_ENDED_MESSAGE = "Your session has ended. Please sign in again.";
 
 	private final JwtTokenProvider tokenProvider;
 	private final SessionRevocationStore sessionRevocationStore;
 	private final ObjectProvider<ObjectMapper> objectMapperProvider;
 
 	private volatile ObjectMapper objectMapper;
+	private volatile ApiResponseAuthenticationEntryPoint sessionEndedEntryPoint;
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
 		String jwt = getJwtFromRequest(request);
+		// Verified once: every claim below comes from this (an RSA check per read otherwise).
+		Claims claims = StringUtils.hasText(jwt) ? verifiedClaims(jwt) : null;
 
-		if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-			String tokenType = null;
-			try {
-				tokenType = tokenProvider.getTokenType(jwt);
-			} catch (Exception e) {
-				logger.error("Failed to read the token type: " + e.getMessage());
-			}
+		if (claims != null) {
+			String tokenType = claim(claims, JwtTokenProvider.CLAIM_TYPE);
 
 			// A refresh token carries the same tenant binding as an access token
 			// and a much longer life, so without this check a leaked one is a
@@ -72,9 +77,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			String username = null;
 			String accountId = null;
 			try {
-				username = tokenProvider.getUsernameFromToken(jwt);
-				String accH = tokenProvider.getAccountIdHashedFromToken(jwt);
-				String accE = tokenProvider.getAccountIdEncryptedFromToken(jwt);
+				username = claims.getSubject();
+				String accH = claim(claims, "accH");
+				String accE = claim(claims, "accE");
 
 				if (accH != null && accE != null) {
 					String decryptedAcc = SecurityUtils.decrypt(accE);
@@ -97,14 +102,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 				return;
 			}
 
-			// A user's access tokens minted before their last password change
-			// are dead (AS-03 C08), otherwise a stolen token outlives the change
-			// by up to an hour. Only user ACCESS tokens: a CHANNEL_WEBHOOK token
-			// is embedded in a provider's webhook URL and has nothing to do with
-			// the user's password; refresh tokens were refused above.
-			if (isAccessToken(tokenType) && sessionRevocationStore.isRevoked(accountId, issuedAt(jwt))) {
-				logger.info("Access token predates the account's last password change — rejecting request");
-				reject(response, TOKEN_REVOKED_MESSAGE, ErrorCodes.TOKEN_REVOKED);
+			// A revoked user access token is dead before it expires (AS-03 C08,
+			// PLT-05): its session was signed out (sid), or it predates the
+			// account's cut-off (password change, deactivation). One Redis read;
+			// Redis down means "not revoked" (see SessionRevocationStore). Only
+			// user ACCESS tokens: a CHANNEL_WEBHOOK token is embedded in a
+			// provider's webhook URL and belongs to no sign-in session; refresh
+			// tokens were refused above. A token without sid (minted before
+			// PLT-05) is judged by the cut-off only and dies at its expiry.
+			if (isAccessToken(tokenType) && sessionRevocationStore.isRevoked(accountId, issuedAt(claims),
+					claim(claims, JwtTokenProvider.CLAIM_SESSION_ID))) {
+				logger.info("Access token was revoked (session ended or account cut-off) — rejecting request");
+				SecurityContextHolder.clearContext();
+				sessionEndedEntryPoint().commence(request, response,
+						new CredentialsExpiredException("Access token revoked"));
 				return;
 			}
 
@@ -134,14 +145,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		return tokenType == null || JwtTokenProvider.TYPE_ACCESS.equals(tokenType);
 	}
 
-	/** {@code null} when unreadable — the store then treats the token as revoked if a change is on record. */
-	private Instant issuedAt(String jwt) {
+	/**
+	 * The verified claims, or {@code null} for a token that fails the signature,
+	 * expiry or key rules: the request then continues unauthenticated, and the
+	 * service's entry point answers if the route needs a credential.
+	 */
+	private Claims verifiedClaims(String jwt) {
 		try {
-			return tokenProvider.getIssuedAt(jwt);
+			return tokenProvider.getVerifiedClaims(jwt);
 		} catch (Exception e) {
-			logger.warn("Failed to read the token's issued-at: " + e.getClass().getSimpleName());
+			// Expired or foreign tokens are routine: no stack trace per request.
+			if (logger.isDebugEnabled()) {
+				logger.debug("JWT rejected: " + e.getClass().getSimpleName());
+			}
 			return null;
 		}
+	}
+
+	/** A string claim, or {@code null} when absent or not a string. */
+	private String claim(Claims claims, String name) {
+		try {
+			return claims.get(name, String.class);
+		} catch (Exception e) {
+			logger.warn("Unreadable '" + name + "' claim: " + e.getClass().getSimpleName());
+			return null;
+		}
+	}
+
+	/** {@code null} when absent — the store then treats the token as revoked if a cut-off is on record. */
+	private static Instant issuedAt(Claims claims) {
+		return claims.getIssuedAt() != null ? claims.getIssuedAt().toInstant() : null;
+	}
+
+	/**
+	 * The shared 401 answer ({@link ApiResponseAuthenticationEntryPoint},
+	 * {@code AUTH_401} in the envelope) with the session-ended message. Called
+	 * directly rather than left to the chain, so every service answers 401 even
+	 * where its chain names no entry point (speech-service would answer an
+	 * empty 403, which the portal does not treat as an ended session).
+	 */
+	private ApiResponseAuthenticationEntryPoint sessionEndedEntryPoint() {
+		ApiResponseAuthenticationEntryPoint entryPoint = sessionEndedEntryPoint;
+		if (entryPoint == null) {
+			entryPoint = new ApiResponseAuthenticationEntryPoint(objectMapper(), SESSION_ENDED_MESSAGE);
+			sessionEndedEntryPoint = entryPoint;
+		}
+		return entryPoint;
 	}
 
 	/**

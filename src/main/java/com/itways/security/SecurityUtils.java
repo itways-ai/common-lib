@@ -1,19 +1,12 @@
 package com.itways.security;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.Base64;
-
-import javax.crypto.Cipher;
-import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
+
+import com.itways.security.core.CredentialCrypto;
 
 /**
  * AES-256-GCM encryption and SHA-256 hashing for the platform's tenant-binding
@@ -29,14 +22,14 @@ import lombok.extern.slf4j.Slf4j;
  * <p>Hard cut from the previous AES-ECB scheme: values encrypted before the
  * GCM cutover no longer decrypt and must be re-minted (API keys, stored AI
  * provider keys, channel bot/auth tokens, JWT accE claims).
+ *
+ * <p>The primitives themselves are {@link CredentialCrypto}'s, shared with
+ * code that has no Spring (the api-gateway); this class holds the configured
+ * key and adds the logging.
  */
 @Component
 @Slf4j
 public class SecurityUtils {
-
-    private static final int IV_LENGTH_BYTES = 12;
-    private static final int TAG_LENGTH_BITS = 128;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private static SecretKeySpec encryptionKey;
 
@@ -56,24 +49,11 @@ public class SecurityUtils {
     }
 
     private static SecretKeySpec deriveKey(String secret) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return new SecretKeySpec(digest.digest(secret.getBytes(StandardCharsets.UTF_8)), "AES");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
+        return CredentialCrypto.deriveKey(secret);
     }
 
     public static String hash(String value) {
-        if (value == null)
-            return null;
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedhash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(encodedhash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Error hashing value", e);
-        }
+        return CredentialCrypto.hash(value);
     }
 
     public static String encrypt(String value) {
@@ -83,17 +63,7 @@ public class SecurityUtils {
         }
         requireKey();
         try {
-            byte[] iv = new byte[IV_LENGTH_BYTES];
-            SECURE_RANDOM.nextBytes(iv);
-
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, encryptionKey, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
-            byte[] ciphertext = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
-
-            ByteBuffer buffer = ByteBuffer.allocate(iv.length + ciphertext.length);
-            buffer.put(iv);
-            buffer.put(ciphertext);
-            return Base64.getEncoder().encodeToString(buffer.array());
+            return CredentialCrypto.encrypt(encryptionKey, value);
         } catch (Exception e) {
             // Never log the plaintext — it is secret material by definition here.
             log.error("Encryption failed: {}", e.getClass().getSimpleName());
@@ -106,25 +76,22 @@ public class SecurityUtils {
             return null;
         requireKey();
         try {
-            byte[] decoded = Base64.getDecoder().decode(encryptedValue);
-            if (decoded.length <= IV_LENGTH_BYTES) {
-                throw new IllegalArgumentException("Ciphertext too short");
-            }
-            ByteBuffer buffer = ByteBuffer.wrap(decoded);
-            byte[] iv = new byte[IV_LENGTH_BYTES];
-            buffer.get(iv);
-            byte[] ciphertext = new byte[buffer.remaining()];
-            buffer.get(ciphertext);
-
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, encryptionKey, new GCMParameterSpec(TAG_LENGTH_BITS, iv));
-            return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+            return CredentialCrypto.decrypt(encryptionKey, encryptedValue);
         } catch (Exception e) {
             // Deliberately do NOT log the ciphertext (or anything derived from
             // it): pre-GCM behavior leaked encrypted credentials into logs.
             log.error("Decryption failed: {}", e.getClass().getSimpleName());
             throw new RuntimeException("Error decrypting value", e);
         }
+    }
+
+    /**
+     * The configured AES key, for {@code ApiKeyProvider}'s {@code ApiKeyCodec}.
+     * Throws, as {@link #decrypt} does, when it is not initialised.
+     */
+    static SecretKeySpec encryptionKey() {
+        requireKey();
+        return encryptionKey;
     }
 
     private static void requireKey() {

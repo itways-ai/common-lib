@@ -15,7 +15,12 @@ public class ErrorCodes {
     public static final String INTERNAL_ERROR = "SYS_001";
     public static final String UNAUTHORIZED = "AUTH_401";
     public static final String FORBIDDEN = "AUTH_403";
-    /** An access token issued before the account's last password change. */
+    /**
+     * Formerly sent for an access token issued before the account's last
+     * password change. No service sends it any more: since PLT-05 every revoked
+     * access token (sign-out, password change, deactivation) gets
+     * {@link #UNAUTHORIZED}. Kept so existing references compile.
+     */
     public static final String TOKEN_REVOKED = "AUTH_TOKEN_REVOKED";
     public static final String ACCOUNT_LOCKED = "AUTH_008";
     public static final String CAPTCHA_INVALID = "AUTH_009";
