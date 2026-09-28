@@ -24,10 +24,16 @@ import java.util.regex.Pattern;
  * the name resolves — only to public addresses.
  *
  * <p>
- * Use {@link #problem(String, Resolver)} when saving a setting (a readable
- * reason, or empty when acceptable) and {@link #requirePublic(String, Resolver)}
- * right before calling out. Checking at call time as well matters: a name that
- * resolved to a public address on save can point somewhere else later.
+ * Use {@link #strictProblem(String, Resolver)} when a person saves a setting (a
+ * readable reason, or empty when acceptable: the host must resolve, to public
+ * addresses only) and {@link #requirePublic(String, Resolver)} right before
+ * calling out. {@link #problem(String, Resolver)} is the lenient form for
+ * checks that must not depend on DNS being reachable, such as re-checking
+ * stored rows at startup. Checking at call time as well matters: a name that
+ * resolved to a public address on save can point somewhere else later, and a
+ * caller that resolves the name again for the connection itself leaves a
+ * window between the check and the connect (DNS rebinding), so it should
+ * connect to the very addresses it checked.
  */
 public final class PublicUrlPolicy {
 
@@ -55,6 +61,20 @@ public final class PublicUrlPolicy {
 	 * syntactic rules apply; the call-time check catches it later.
 	 */
 	public static Optional<String> problem(String url, Resolver resolver) {
+		return problem(url, resolver, false);
+	}
+
+	/**
+	 * As {@link #problem(String, Resolver)}, but a host name that does not
+	 * resolve is itself a problem. For the moment a person saves a setting:
+	 * a name that is not live cannot be checked, and accepting it would let
+	 * it be pointed at a private address after the check (SPC-03).
+	 */
+	public static Optional<String> strictProblem(String url, Resolver resolver) {
+		return problem(url, resolver, true);
+	}
+
+	private static Optional<String> problem(String url, Resolver resolver, boolean mustResolve) {
 		URI uri;
 		try {
 			uri = new URI(url == null ? "" : url.trim());
@@ -98,7 +118,10 @@ public final class PublicUrlPolicy {
 		try {
 			addresses = resolver.resolve(host);
 		} catch (UnknownHostException e) {
-			return Optional.empty();
+			return mustResolve ? Optional.of("host does not resolve (" + host + ")") : Optional.empty();
+		}
+		if (mustResolve && addresses.length == 0) {
+			return Optional.of("host does not resolve (" + host + ")");
 		}
 		for (InetAddress address : addresses) {
 			if (!isPublic(address)) {
@@ -115,18 +138,9 @@ public final class PublicUrlPolicy {
 	 * @throws IllegalArgumentException naming the reason
 	 */
 	public static void requirePublic(String url, Resolver resolver) {
-		Optional<String> problem = problem(url, resolver);
+		Optional<String> problem = strictProblem(url, resolver);
 		if (problem.isPresent()) {
 			throw new IllegalArgumentException("URL " + problem.get());
-		}
-		String host = normaliseHost(URI.create(url.trim()).getHost());
-		if (host.startsWith("[") || DOTTED_QUAD.matcher(host).matches()) {
-			return;
-		}
-		try {
-			resolver.resolve(host);
-		} catch (UnknownHostException e) {
-			throw new IllegalArgumentException("URL host does not resolve (" + host + ")");
 		}
 	}
 
