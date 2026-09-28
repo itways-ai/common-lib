@@ -1,2 +1,3 @@
 com.itways.common.config.SwaggerConfig
 com.itways.cache.config.CacheAutoConfiguration
+com.itways.messaging.RabbitPublishingAutoConfiguration

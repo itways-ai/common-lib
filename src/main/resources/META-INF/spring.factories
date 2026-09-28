@@ -1,0 +1,9 @@
+# PLT-20: no generated "user" and no "Using generated security password" log line.
+# See com.itways.security.config.GeneratedUserFilter.
+org.springframework.boot.autoconfigure.AutoConfigurationImportFilter=\
+com.itways.security.config.GeneratedUserFilter
+
+# PLT-30: publisher confirms and returns on every service's RabbitMQ connection.
+# See com.itways.messaging.RabbitPublishingDefaults.
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.itways.messaging.RabbitPublishingDefaults
