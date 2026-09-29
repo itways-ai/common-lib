@@ -34,6 +34,10 @@ mvn -f common-lib/pom.xml install          # runs the tests; -DskipTests to skip
 
 Each service's CI installs it first, and the `libs` stage of the workspace's
 `docker/java/Dockerfile` installs the reactor before the other libraries.
+common-lib's own CI, `.github/workflows/ci.yml`, calls the platform's shared Java
+pipeline (`java-build.yml` in the workspace repository, `itways-ai/platform-workspace`)
+on every push and pull request: `mvn verify`, then `mvn spotless:check`. As a library it
+publishes no image.
 On a host whose JDK is newer than 21, Lombok fails with "cannot find symbol"; build
 with JDK 21 (or in the `maven:3.9-eclipse-temurin-21` image).
 

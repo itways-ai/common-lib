@@ -432,9 +432,11 @@ RabbitMQ connection keys, where each service sets them:
 | speech | `${SPRING_RABBITMQ_*}` | `:77-80` |
 | notification | **none**: Boot's defaults (localhost:5672, guest/guest) | only `spring.rabbitmq.listener.simple.*` |
 
-In compose, every service gets `SPRING_RABBITMQ_HOST` / `PORT` / `USERNAME` / `PASSWORD`
-from `x-common-env` (`docker-compose.yml:48-51`). Boot binds those environment variables
-directly, ahead of `application.properties`. No service sets
+In compose, every service that uses RabbitMQ gets `SPRING_RABBITMQ_HOST` / `PORT` /
+`USERNAME` / `PASSWORD` in its own `environment:` block, from the `x-rabbitmq-env` fragment
+it merges (`docker-compose.yml`; one block per service since PLT-31, which replaced the
+former shared `x-common-env`). Boot binds those environment variables directly, ahead of
+`application.properties`. No service sets
 `spring.output.ansi.enabled`, so Boot's default (`detect`) applied before and still
 applies.
 
