@@ -1,18 +1,16 @@
 package com.itways.common.config;
 
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.Collections;
-
-import org.springdoc.core.customizers.OpenApiCustomizer;
-
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Set;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 
 /**
  * Describes a Java {@code Object} as "any value" instead of "an object".

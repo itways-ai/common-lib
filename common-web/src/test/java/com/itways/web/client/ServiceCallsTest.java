@@ -3,6 +3,10 @@ package com.itways.web.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.common.correlation.RequestIds;
+import com.itways.feign.ForwardedAuthorizationResolver;
+import com.itways.security.internal.InternalServiceToken;
+import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -10,7 +14,6 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,11 +31,6 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import com.itways.common.correlation.RequestIds;
-import com.itways.feign.ForwardedAuthorizationResolver;
-import com.itways.security.internal.InternalServiceToken;
-import com.sun.net.httpserver.HttpServer;
 
 /**
  * The service token and the caller's credential on every RestClient call to

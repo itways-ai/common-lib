@@ -12,12 +12,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.activity.dto.ActivityCategory;
+import com.itways.activity.dto.ActivitySeverity;
+import com.itways.common.correlation.RequestIds;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -25,12 +29,6 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itways.activity.dto.AccountActivityEvent;
-import com.itways.activity.dto.ActivityCategory;
-import com.itways.activity.dto.ActivitySeverity;
-import com.itways.common.correlation.RequestIds;
 
 class ActivityOutboxTest {
 

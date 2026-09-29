@@ -2,6 +2,7 @@ package com.itways;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.security.core.TokenVerifier;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -16,10 +17,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
 import org.junit.jupiter.api.Test;
-
-import com.itways.security.core.TokenVerifier;
 
 /**
  * common-core is the framework-free module: the api-gateway (WebFlux) and every

@@ -14,13 +14,13 @@ import java.util.UUID;
  * of mapping and writing the table itself.
  */
 public record ChannelIdentityView(UUID id, String accountId, String phone, String externalUserId,
-		String displayName, LocalDateTime verifiedAt, LocalDateTime lastUsedAt) {
+        String displayName, LocalDateTime verifiedAt, LocalDateTime lastUsedAt) {
 
-	/** Body of {@code POST /api/channels/internal/identities/link}. */
-	public record LinkRequest(String phone, String externalUserId, String displayName) {
-	}
+    /** Body of {@code POST /api/channels/internal/identities/link}. */
+    public record LinkRequest(String phone, String externalUserId, String displayName) {
+    }
 
-	/** Body of {@code POST /api/channels/internal/identities/used}. */
-	public record UsedRequest(String phone) {
-	}
+    /** Body of {@code POST /api/channels/internal/identities/used}. */
+    public record UsedRequest(String phone) {
+    }
 }

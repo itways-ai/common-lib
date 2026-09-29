@@ -1,14 +1,12 @@
 package com.itways.annotation;
 
+import com.itways.web.correlation.RequestCorrelationConfig;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
 import org.springframework.context.annotation.Import;
-
-import com.itways.web.correlation.RequestCorrelationConfig;
 
 /**
  * Gives every request a request id ({@code X-Request-Id}) that goes to the

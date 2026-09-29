@@ -2,13 +2,12 @@ package com.itways.messaging.correlation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.common.correlation.RequestIds;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-
-import com.itways.common.correlation.RequestIds;
 
 class RequestIdPublishPostProcessorTest {
 

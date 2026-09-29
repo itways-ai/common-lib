@@ -1,7 +1,11 @@
 package com.itways.messaging;
 
+import com.itways.contracts.account.AccountEvents;
+import com.itways.messaging.correlation.RequestIdListenerAdvice;
+import com.itways.messaging.correlation.RequestIdListenerAdviceRegistrar;
+import com.itways.messaging.correlation.RequestIdPublishPostProcessor;
 import java.util.Set;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -14,13 +18,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
-
-import com.itways.contracts.account.AccountEvents;
-import com.itways.messaging.correlation.RequestIdListenerAdvice;
-import com.itways.messaging.correlation.RequestIdListenerAdviceRegistrar;
-import com.itways.messaging.correlation.RequestIdPublishPostProcessor;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * What a service's {@code RabbitTemplate} does with a nack or a returned message

@@ -1,8 +1,7 @@
 package com.itways.contracts.knowledge;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 
 /**
  * Pre-embedded rows for one index, from one source file or page.

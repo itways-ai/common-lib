@@ -2,7 +2,6 @@ package com.itways.common.diagnostics;
 
 import java.sql.SQLException;
 import java.util.Locale;
-
 import org.springframework.boot.diagnostics.FailureAnalysis;
 import org.springframework.boot.diagnostics.FailureAnalyzer;
 import org.springframework.core.env.Environment;

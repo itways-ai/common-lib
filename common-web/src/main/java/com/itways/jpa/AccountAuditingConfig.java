@@ -2,7 +2,6 @@ package com.itways.jpa;
 
 import java.util.Map;
 import java.util.Optional;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,18 +26,18 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @EnableJpaAuditing(auditorAwareRef = "auditorProvider")
 public class AccountAuditingConfig {
 
-	@Bean
-	public AuditorAware<String> auditorProvider() {
-		return () -> {
-			Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-			if (authentication == null || !authentication.isAuthenticated()) {
-				return Optional.empty();
-			}
-			Object details = authentication.getDetails();
-			if (details instanceof Map<?, ?> map) {
-				return Optional.ofNullable((String) map.get("accountId"));
-			}
-			return Optional.empty();
-		};
-	}
+    @Bean
+    public AuditorAware<String> auditorProvider() {
+        return () -> {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return Optional.empty();
+            }
+            Object details = authentication.getDetails();
+            if (details instanceof Map<?, ?> map) {
+                return Optional.ofNullable((String) map.get("accountId"));
+            }
+            return Optional.empty();
+        };
+    }
 }

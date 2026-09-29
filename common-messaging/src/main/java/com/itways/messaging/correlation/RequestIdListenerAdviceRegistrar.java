@@ -1,7 +1,6 @@
 package com.itways.messaging.correlation;
 
 import java.util.Arrays;
-
 import org.aopalliance.aop.Advice;
 import org.springframework.amqp.rabbit.config.AbstractRabbitListenerContainerFactory;
 import org.springframework.beans.factory.config.BeanPostProcessor;

@@ -5,9 +5,11 @@ import com.itways.common.exception.BusinessException;
 import com.itways.common.response.ApiResponse;
 import com.itways.security.core.SecurityMessages;
 import com.itways.web.correlation.CurrentRequestId;
-
 import jakarta.validation.ConstraintViolationException;
-
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -16,9 +18,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.stereotype.Component;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -34,12 +36,6 @@ import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import lombok.extern.slf4j.Slf4j;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * The platform's shared error mapping (AS-13), for every service.

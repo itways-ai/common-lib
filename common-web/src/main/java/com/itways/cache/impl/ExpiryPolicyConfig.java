@@ -1,8 +1,8 @@
 package com.itways.cache.impl;
 
-import org.ehcache.expiry.ExpiryPolicy;
 import java.time.Duration;
 import java.util.function.Supplier;
+import org.ehcache.expiry.ExpiryPolicy;
 
 /**
  * Custom expiry policy that allows configuring whether the TTL is reset on

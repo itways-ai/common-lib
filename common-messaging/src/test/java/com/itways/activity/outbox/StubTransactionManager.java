@@ -1,7 +1,6 @@
 package com.itways.activity.outbox;
 
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;

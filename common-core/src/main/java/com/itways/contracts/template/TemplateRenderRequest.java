@@ -1,12 +1,10 @@
 package com.itways.contracts.template;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.Map;
 
 /**
  * Shared by template-service, which renders, and conversation-service, whose

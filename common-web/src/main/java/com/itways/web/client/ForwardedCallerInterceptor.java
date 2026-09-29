@@ -1,16 +1,14 @@
 package com.itways.web.client;
 
+import com.itways.common.correlation.RequestIds;
+import com.itways.feign.ForwardedAuthorizationResolver;
+import com.itways.web.correlation.CurrentRequestId;
 import java.io.IOException;
 import java.util.function.Supplier;
-
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
-
-import com.itways.common.correlation.RequestIds;
-import com.itways.feign.ForwardedAuthorizationResolver;
-import com.itways.web.correlation.CurrentRequestId;
 
 /**
  * Puts the caller's credential ({@link CallerCredentials}) on every request a

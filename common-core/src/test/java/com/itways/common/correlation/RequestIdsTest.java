@@ -3,7 +3,6 @@ package com.itways.common.correlation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
 
 /** The request-id rule the gateway and the servlet services share (ARC-25). */

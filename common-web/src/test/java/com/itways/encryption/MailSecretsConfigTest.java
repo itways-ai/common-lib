@@ -2,6 +2,7 @@ package com.itways.encryption;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.annotation.EnableMailSecrets;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -9,8 +10,6 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import com.itways.annotation.EnableMailSecrets;
 
 /** How {@code @EnableMailSecrets} builds the bean, when it fails, and when it stays away. */
 @ExtendWith(OutputCaptureExtension.class)

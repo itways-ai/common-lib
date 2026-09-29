@@ -1,8 +1,7 @@
 package com.itways.scope;
 
-import java.util.UUID;
-
 import com.itways.common.exception.BusinessException;
+import java.util.UUID;
 
 /** The refusals every service gives for assistant scope, with the same codes everywhere. */
 public final class ScopeErrors {

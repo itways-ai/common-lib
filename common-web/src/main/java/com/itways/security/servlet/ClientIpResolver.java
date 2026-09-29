@@ -1,22 +1,19 @@
 package com.itways.security.servlet;
 
+import com.itways.common.net.ClientIp;
+import com.itways.common.net.TrustedProxies;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import com.itways.common.net.ClientIp;
-import com.itways.common.net.TrustedProxies;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * The client IP of a servlet request, for audit rows and per-client limits

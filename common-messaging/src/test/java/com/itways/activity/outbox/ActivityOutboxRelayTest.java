@@ -13,18 +13,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itways.activity.dto.AccountActivityEvent;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.AmqpIOException;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itways.activity.dto.AccountActivityEvent;
 
 class ActivityOutboxRelayTest {
 

@@ -1,16 +1,13 @@
 package com.itways.web.correlation;
 
-import java.io.IOException;
-
-import org.slf4j.MDC;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 import com.itways.common.correlation.RequestIds;
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import org.slf4j.MDC;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Gives every request a request id (ARC-25): the caller's {@code X-Request-Id}

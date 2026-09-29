@@ -2,11 +2,9 @@ package com.itways.activity.outbox;
 
 import java.time.Duration;
 import java.util.regex.Pattern;
-
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * {@code itways.activity.outbox.*}: the transactional outbox for activity events

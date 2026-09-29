@@ -1,14 +1,12 @@
 package com.itways.annotation;
 
+import com.itways.security.internal.InternalEndpointGuardConfig;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
 import org.springframework.context.annotation.Import;
-
-import com.itways.security.internal.InternalEndpointGuardConfig;
 
 /**
  * Answers every proxied request for an {@code /internal/} path with the real

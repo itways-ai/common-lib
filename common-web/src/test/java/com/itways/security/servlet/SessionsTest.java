@@ -2,18 +2,16 @@ package com.itways.security.servlet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.security.servlet.Sessions.CredentialKind;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
-
-import com.itways.security.servlet.Sessions.CredentialKind;
 
 /**
  * The reconciled USER_SESSION rule (ARC-11), every branch: the deny-list of

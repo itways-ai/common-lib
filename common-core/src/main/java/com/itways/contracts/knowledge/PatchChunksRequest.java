@@ -1,8 +1,7 @@
 package com.itways.contracts.knowledge;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 
 /**
  * An incremental edit of an index: rows to upsert and rows to delete.

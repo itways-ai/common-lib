@@ -3,21 +3,18 @@ package com.itways.web.correlation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.common.correlation.RequestIds;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.util.WebUtils;
-
-import com.itways.common.correlation.RequestIds;
-
-import jakarta.servlet.DispatcherType;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 
 /** The request-id filter (ARC-25): which id, where it goes, and that the thread is left clean. */
 class RequestIdFilterTest {

@@ -14,12 +14,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record IntentEmbeddingUpdate(
-		Long versionId,
-		float[] vector,
-		String embeddingModel) {
+        Long versionId,
+        float[] vector,
+        String embeddingModel) {
 
-	/** Without the model — for callers that predate it; journey-service stores the vector as of unknown origin. */
-	public IntentEmbeddingUpdate(Long versionId, float[] vector) {
-		this(versionId, vector, null);
-	}
+    /** Without the model — for callers that predate it; journey-service stores the vector as of unknown origin. */
+    public IntentEmbeddingUpdate(Long versionId, float[] vector) {
+        this(versionId, vector, null);
+    }
 }

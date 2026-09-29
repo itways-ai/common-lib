@@ -1,12 +1,14 @@
 package com.itways.activity.outbox;
 
+import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.common.correlation.RequestIds;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.ReturnedMessage;
@@ -17,11 +19,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
-
-import com.itways.activity.dto.AccountActivityEvent;
-import com.itways.common.correlation.RequestIds;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Publishes a batch with correlated publisher confirms and returns, and waits

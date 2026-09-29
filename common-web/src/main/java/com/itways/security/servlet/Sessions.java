@@ -1,13 +1,11 @@
 package com.itways.security.servlet;
 
+import com.itways.security.core.TokenVerifier;
 import java.util.Map;
-
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
-
-import com.itways.security.core.TokenVerifier;
 
 /**
  * What kind of credential the current session was built from, read from the

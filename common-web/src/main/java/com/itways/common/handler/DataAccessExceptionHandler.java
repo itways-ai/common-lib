@@ -1,7 +1,9 @@
 package com.itways.common.handler;
 
+import com.itways.common.response.ApiResponse;
+import com.itways.web.correlation.CurrentRequestId;
 import java.util.UUID;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -11,11 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import com.itways.common.response.ApiResponse;
-import com.itways.web.correlation.CurrentRequestId;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Maps {@link DataIntegrityViolationException} — usually a unique constraint

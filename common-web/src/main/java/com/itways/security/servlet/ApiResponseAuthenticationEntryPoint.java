@@ -1,17 +1,14 @@
 package com.itways.security.servlet;
 
-import java.io.IOException;
-
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.AuthenticationEntryPoint;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.common.constants.ErrorCodes;
 import com.itways.common.response.ApiResponse;
 import com.itways.security.core.SecurityMessages;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
 
 /**
  * "Who are you?": 401 {@code AUTH_401} in the {@link ApiResponse} envelope for

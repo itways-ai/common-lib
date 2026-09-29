@@ -1,9 +1,8 @@
 package com.itways.cache.impl;
 
 import com.itways.cache.CacheStore;
-import org.ehcache.Cache;
-
 import java.util.Optional;
+import org.ehcache.Cache;
 
 public class EhcacheStore<K, V> implements CacheStore<K, V> {
 

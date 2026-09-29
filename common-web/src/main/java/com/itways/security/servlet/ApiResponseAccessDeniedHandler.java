@@ -1,17 +1,14 @@
 package com.itways.security.servlet;
 
-import java.io.IOException;
-
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.web.access.AccessDeniedHandler;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.common.constants.ErrorCodes;
 import com.itways.common.response.ApiResponse;
 import com.itways.security.core.SecurityMessages;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
  * "You may not": 403 {@code AUTH_403} in the {@link ApiResponse} envelope for

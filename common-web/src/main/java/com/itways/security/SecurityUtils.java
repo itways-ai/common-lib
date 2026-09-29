@@ -1,12 +1,10 @@
 package com.itways.security;
 
+import com.itways.security.core.CredentialCrypto;
 import javax.crypto.spec.SecretKeySpec;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import lombok.extern.slf4j.Slf4j;
-
-import com.itways.security.core.CredentialCrypto;
 
 /**
  * AES-256-GCM encryption and SHA-256 hashing for the platform's tenant-binding

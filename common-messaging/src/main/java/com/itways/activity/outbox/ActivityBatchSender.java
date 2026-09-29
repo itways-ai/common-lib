@@ -1,8 +1,7 @@
 package com.itways.activity.outbox;
 
-import java.util.List;
-
 import com.itways.activity.dto.AccountActivityEvent;
+import java.util.List;
 
 /**
  * Sends a batch of activity events and returns only once the broker has

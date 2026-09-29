@@ -1,9 +1,8 @@
 package com.itways.contracts.account;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * {@link AccountEvents#ACCOUNT_DELETED}: the account is gone, and every service

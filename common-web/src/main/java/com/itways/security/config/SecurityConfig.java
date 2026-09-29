@@ -1,8 +1,5 @@
 package com.itways.security.config;
 
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-
 import com.itways.security.ApiKeyProvider;
 import com.itways.security.ApiKeyStatusStore;
 import com.itways.security.SecurityUtils;
@@ -13,9 +10,10 @@ import com.itways.security.servlet.ApiKeyAuthenticationFilter;
 import com.itways.security.servlet.ClientIpResolver;
 import com.itways.security.servlet.JwtAuthenticationFilter;
 import com.itways.web.client.ServiceCallsConfig;
-
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 
 /**
  * What {@code @EnableCustomSecurity} brings. Listed explicitly (it used to
@@ -26,13 +24,13 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Configuration
 @Import({ SecurityUtils.class, ApiKeyProvider.class, ApiKeyStatusStore.class, SessionRevocationStore.class,
-		JwtTokenProvider.class, InternalServiceToken.class, JwtAuthenticationFilter.class,
-		ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class, SecurityErrorHandlingConfig.class,
-		ClientIpResolver.class, ServiceCallsConfig.class })
+        JwtTokenProvider.class, InternalServiceToken.class, JwtAuthenticationFilter.class,
+        ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class, SecurityErrorHandlingConfig.class,
+        ClientIpResolver.class, ServiceCallsConfig.class })
 public class SecurityConfig {
-	
-	@PostConstruct
-	public void print() {
-		log.info("✅ Common-lib security configuration initialized");
-	}
+
+    @PostConstruct
+    public void print() {
+        log.info("✅ Common-lib security configuration initialized");
+    }
 }

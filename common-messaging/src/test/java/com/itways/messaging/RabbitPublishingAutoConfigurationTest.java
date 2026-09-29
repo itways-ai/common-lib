@@ -7,9 +7,9 @@ import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
+import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.io.support.SpringFactoriesLoader;
-import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.expression.Expression;
 import org.springframework.test.util.ReflectionTestUtils;
 

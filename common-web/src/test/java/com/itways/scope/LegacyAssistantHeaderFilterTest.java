@@ -6,8 +6,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.itways.annotation.EnableAssistantScope;
+import com.itways.annotation.EnableCommon;
+import com.itways.security.internal.InternalEndpointGuardConfig;
+import com.itways.web.correlation.RequestCorrelationConfig;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
@@ -23,13 +27,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.itways.annotation.EnableAssistantScope;
-import com.itways.annotation.EnableCommon;
-import com.itways.security.internal.InternalEndpointGuardConfig;
-import com.itways.web.correlation.RequestCorrelationConfig;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /** The legacy assistant header reaches controllers as {@code X-Assistant-Id} (2.1.0 transition). */
 @SuppressWarnings("removal") // the legacy header name is what these tests send

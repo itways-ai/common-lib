@@ -1,5 +1,7 @@
 package com.itways.security.core;
 
+import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.Jwts;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -8,11 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
-
 import javax.crypto.spec.SecretKeySpec;
-
-import io.jsonwebtoken.JwtBuilder;
-import io.jsonwebtoken.Jwts;
 
 /** Test-only keys and credentials, minted the way auth-service, channels-service and account-service do. */
 final class TestTokens {

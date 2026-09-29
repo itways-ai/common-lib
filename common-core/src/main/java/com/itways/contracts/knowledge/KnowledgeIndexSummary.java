@@ -1,10 +1,8 @@
 package com.itways.contracts.knowledge;
 
-import java.util.UUID;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.UUID;
 
 /**
  * One knowledge index as lists show it: its name and who it belongs to.

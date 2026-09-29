@@ -1,8 +1,8 @@
 package com.itways.cache.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.impl.EhcacheStoreFactory;
 import com.itways.cache.impl.HybridCacheStoreFactory;

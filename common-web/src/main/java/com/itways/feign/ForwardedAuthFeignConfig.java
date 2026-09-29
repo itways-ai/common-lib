@@ -1,20 +1,18 @@
 package com.itways.feign;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import com.itways.common.correlation.RequestIds;
 import com.itways.security.internal.InternalServiceToken;
 import com.itways.web.client.CallerCredentials;
 import com.itways.web.client.ServiceCalls;
 import com.itways.web.correlation.CurrentRequestId;
-
 import feign.RequestInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * Forwards the caller's credential on every Feign call a service makes.
@@ -49,35 +47,35 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ForwardedAuthFeignConfig {
 
-	@Bean
-	public RequestInterceptor forwardedAuthRequestInterceptor(ObjectProvider<ForwardedAuthorizationResolver> fallback,
-			@Value("${itways.internal-token:}") String internalToken) {
-		String serviceToken = internalToken == null ? "" : internalToken.trim();
-		return template -> {
-			if (!serviceToken.isEmpty()) {
-				template.header(InternalServiceToken.HEADER, serviceToken);
-			}
-			if (!template.headers().containsKey(RequestIds.HEADER)) {
-				CurrentRequestId.get().ifPresent(id -> template.header(RequestIds.HEADER, id));
-			}
-			HttpServletRequest request = CallerCredentials.currentRequest();
-			if (request == null) {
-				return;
-			}
-			CallerCredentials credentials = CallerCredentials.of(request, fallback.getIfAvailable());
+    @Bean
+    public RequestInterceptor forwardedAuthRequestInterceptor(ObjectProvider<ForwardedAuthorizationResolver> fallback,
+            @Value("${itways.internal-token:}") String internalToken) {
+        String serviceToken = internalToken == null ? "" : internalToken.trim();
+        return template -> {
+            if (!serviceToken.isEmpty()) {
+                template.header(InternalServiceToken.HEADER, serviceToken);
+            }
+            if (!template.headers().containsKey(RequestIds.HEADER)) {
+                CurrentRequestId.get().ifPresent(id -> template.header(RequestIds.HEADER, id));
+            }
+            HttpServletRequest request = CallerCredentials.currentRequest();
+            if (request == null) {
+                return;
+            }
+            CallerCredentials credentials = CallerCredentials.of(request, fallback.getIfAvailable());
 
-			if (credentials.authorization() != null) {
-				template.header("Authorization", credentials.authorization());
-				log.debug("Forwarding Authorization header");
-			}
-			if (credentials.apiKey() != null) {
-				template.header(ServiceCalls.API_KEY_HEADER, credentials.apiKey());
-				log.debug("Forwarding X-API-KEY header");
-			}
+            if (credentials.authorization() != null) {
+                template.header("Authorization", credentials.authorization());
+                log.debug("Forwarding Authorization header");
+            }
+            if (credentials.apiKey() != null) {
+                template.header(ServiceCalls.API_KEY_HEADER, credentials.apiKey());
+                log.debug("Forwarding X-API-KEY header");
+            }
 
-			if (credentials.isEmpty()) {
-				log.warn("No authentication headers found in current request to forward");
-			}
-		};
-	}
+            if (credentials.isEmpty()) {
+                log.warn("No authentication headers found in current request to forward");
+            }
+        };
+    }
 }

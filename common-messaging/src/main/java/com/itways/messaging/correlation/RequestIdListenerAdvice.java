@@ -1,16 +1,14 @@
 package com.itways.messaging.correlation;
 
+import com.itways.common.correlation.RequestIds;
+import com.rabbitmq.client.LongString;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-
-import com.itways.common.correlation.RequestIds;
-import com.rabbitmq.client.LongString;
 
 /**
  * Puts the request id a message carries ({@value RequestIds#AMQP_HEADER}) in

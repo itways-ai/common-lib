@@ -26,7 +26,7 @@ public interface CacheStore<K, V> {
 
     /**
      * Atomically remove an entry only if it matches the expected value
-     * 
+     *
      * @return true if removed, false otherwise
      */
     boolean remove(K key, V value);

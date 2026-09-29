@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 
 import java.security.KeyPairGenerator;
 import java.util.Base64;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;

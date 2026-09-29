@@ -1,12 +1,11 @@
 package com.itways.notification.dto;
 
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-
-import java.util.Map;
 
 @Data
 @Builder

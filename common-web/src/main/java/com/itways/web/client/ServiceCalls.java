@@ -1,15 +1,13 @@
 package com.itways.web.client;
 
+import com.itways.feign.ForwardedAuthorizationResolver;
+import com.itways.security.internal.InternalServiceToken;
 import java.time.Duration;
 import java.util.Optional;
-
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
-
-import com.itways.feign.ForwardedAuthorizationResolver;
-import com.itways.security.internal.InternalServiceToken;
 
 /**
  * How a service calls the platform's other services over {@code RestClient}

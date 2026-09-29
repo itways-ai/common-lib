@@ -3,13 +3,12 @@ package com.itways.activity.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.itways.activity.publisher.ActivityEventPublisher;
+import com.itways.annotation.EnableActivity;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
-
-import com.itways.activity.publisher.ActivityEventPublisher;
-import com.itways.annotation.EnableActivity;
 
 /** Without the property a service keeps today's behaviour: the publisher, and nothing of the outbox. */
 class ActivityOutboxConfigTest {

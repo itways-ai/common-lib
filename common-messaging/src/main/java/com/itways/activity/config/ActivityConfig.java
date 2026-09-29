@@ -1,9 +1,9 @@
 package com.itways.activity.config;
 
-import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
 import com.itways.activity.outbox.ActivityOutboxConfig;
 import com.itways.amqp.config.RabbitJsonConverterConfig;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 

@@ -1,7 +1,6 @@
 package com.itways.web.net;
 
 import java.time.Duration;
-
 import org.apache.hc.client5.http.DnsResolver;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;

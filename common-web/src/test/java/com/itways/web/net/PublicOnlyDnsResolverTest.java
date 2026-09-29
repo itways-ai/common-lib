@@ -3,20 +3,17 @@ package com.itways.web.net;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.common.net.PublicUrlPolicy;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-
-import com.itways.common.net.PublicUrlPolicy;
 
 /** The resolver's rules, the allow-list added for ARC-11 included. */
 @ExtendWith(OutputCaptureExtension.class)

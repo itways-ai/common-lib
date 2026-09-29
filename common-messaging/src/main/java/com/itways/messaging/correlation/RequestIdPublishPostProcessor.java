@@ -1,11 +1,10 @@
 package com.itways.messaging.correlation;
 
+import com.itways.common.correlation.RequestIds;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
-
-import com.itways.common.correlation.RequestIds;
 
 /**
  * Puts the request id of the work being done on this thread (the logging

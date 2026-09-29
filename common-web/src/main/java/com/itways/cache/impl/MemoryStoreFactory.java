@@ -3,7 +3,6 @@ package com.itways.cache.impl;
 import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

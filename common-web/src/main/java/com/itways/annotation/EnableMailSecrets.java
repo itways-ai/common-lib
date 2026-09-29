@@ -1,14 +1,12 @@
 package com.itways.annotation;
 
+import com.itways.encryption.MailSecretsConfig;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-
 import org.springframework.context.annotation.Import;
-
-import com.itways.encryption.MailSecretsConfig;
 
 /**
  * The {@code MailSecrets} bean from {@code MAIL_SECRETS_KEY} (the key that seals

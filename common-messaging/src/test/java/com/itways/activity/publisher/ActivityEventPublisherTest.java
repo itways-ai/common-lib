@@ -7,15 +7,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.common.correlation.RequestIds;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-
-import com.itways.activity.dto.AccountActivityEvent;
-import com.itways.common.correlation.RequestIds;
 
 /** The direct publisher: an event without a request id is sent exactly as before ARC-25; one with it carries the header. */
 class ActivityEventPublisherTest {

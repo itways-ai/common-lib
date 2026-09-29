@@ -3,11 +3,9 @@ package com.itways.scope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.UUID;
-
-import org.junit.jupiter.api.Test;
-
 import com.itways.common.exception.BusinessException;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 class ListScopeTest {
 

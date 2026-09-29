@@ -1,11 +1,9 @@
 package com.itways.security.jwt;
 
+import com.itways.security.core.PublicKeys;
+import com.itways.security.core.TokenVerifier;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import jakarta.annotation.PostConstruct;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -15,9 +13,9 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
-
-import com.itways.security.core.PublicKeys;
-import com.itways.security.core.TokenVerifier;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component("jwtTokenProvider")
 @Slf4j

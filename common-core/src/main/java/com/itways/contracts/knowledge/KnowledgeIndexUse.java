@@ -1,7 +1,6 @@
 package com.itways.contracts.knowledge;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**

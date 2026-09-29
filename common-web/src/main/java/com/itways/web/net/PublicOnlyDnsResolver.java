@@ -1,17 +1,14 @@
 package com.itways.web.net;
 
+import com.itways.common.net.PublicUrlPolicy;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
-
-import org.apache.hc.client5.http.DnsResolver;
-
-import com.itways.common.net.PublicUrlPolicy;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.client5.http.DnsResolver;
 
 /**
  * DNS for calls to addresses a tenant wrote (SPC-03): resolves a host once,

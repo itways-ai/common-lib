@@ -1,10 +1,8 @@
 package com.itways.contracts.knowledge;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 
 /**
  * Why an index was not moved: the data of the 409 {@code INDEX_SCOPE_IN_USE}.

@@ -8,13 +8,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.itways.common.exception.InvalidApiKeyException;
+import com.itways.security.core.ApiKeyCodec;
+import com.itways.security.core.CredentialCrypto;
+import com.itways.security.core.TokenVerifier;
+import com.itways.security.jwt.JwtTokenProvider;
+import com.itways.security.servlet.ApiKeyAuthenticationFilter;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.util.Base64;
 import java.util.Map;
-
 import javax.crypto.spec.SecretKeySpec;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -25,13 +29,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import com.itways.common.exception.InvalidApiKeyException;
-import com.itways.security.core.ApiKeyCodec;
-import com.itways.security.core.CredentialCrypto;
-import com.itways.security.core.TokenVerifier;
-import com.itways.security.jwt.JwtTokenProvider;
-import com.itways.security.servlet.ApiKeyAuthenticationFilter;
 
 /**
  * common-lib's Spring classes run the security core's rules: same crypto,

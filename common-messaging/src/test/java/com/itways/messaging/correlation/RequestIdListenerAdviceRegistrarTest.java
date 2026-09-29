@@ -2,8 +2,9 @@ package com.itways.messaging.correlation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.messaging.RabbitPublishingAutoConfiguration;
+import com.itways.messaging.RabbitPublishingDefaults;
 import java.util.Collection;
-
 import org.aopalliance.aop.Advice;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -18,9 +19,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.interceptor.RetryOperationsInterceptor;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import com.itways.messaging.RabbitPublishingAutoConfiguration;
-import com.itways.messaging.RabbitPublishingDefaults;
 
 /** Where the request-id advice and post-processor are wired (ARC-25); nothing connects to a broker. */
 class RequestIdListenerAdviceRegistrarTest {

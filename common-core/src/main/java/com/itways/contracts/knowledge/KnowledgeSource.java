@@ -1,9 +1,8 @@
 package com.itways.contracts.knowledge;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * One source of an index — an uploaded file or a crawled page.

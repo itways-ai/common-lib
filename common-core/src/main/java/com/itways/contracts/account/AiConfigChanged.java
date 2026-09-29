@@ -1,9 +1,8 @@
 package com.itways.contracts.account;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * {@link AccountEvents#AI_CONFIG_CHANGED}: the account's AI provider configs were

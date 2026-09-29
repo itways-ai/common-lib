@@ -2,13 +2,12 @@ package com.itways.web.correlation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.common.correlation.RequestIds;
+import com.itways.common.response.ApiResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
-
-import com.itways.common.correlation.RequestIds;
-import com.itways.common.response.ApiResponse;
 
 class CurrentRequestIdTest {
 

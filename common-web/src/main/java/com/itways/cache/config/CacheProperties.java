@@ -1,12 +1,11 @@
 package com.itways.cache.config;
 
-import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
 import com.itways.cache.CacheSettings;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
 @ConfigurationProperties(prefix = "itways.cache")

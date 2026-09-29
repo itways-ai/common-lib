@@ -1,9 +1,8 @@
 package com.itways.annotation;
 
 import com.itways.security.config.SecurityConfig;
-import org.springframework.context.annotation.Import;
-
 import java.lang.annotation.*;
+import org.springframework.context.annotation.Import;
 
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)

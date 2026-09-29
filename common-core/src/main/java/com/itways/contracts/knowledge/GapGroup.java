@@ -1,10 +1,9 @@
 package com.itways.contracts.knowledge;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * Unanswered questions that mean the same thing, grouped for review.

@@ -1,8 +1,7 @@
 package com.itways.feign;
 
-import java.util.Optional;
-
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
 
 /**
  * A second place to find the caller's credential when the inbound request
@@ -18,6 +17,6 @@ import jakarta.servlet.http.HttpServletRequest;
 @FunctionalInterface
 public interface ForwardedAuthorizationResolver {
 
-	/** The value to send as {@code Authorization}, or empty when this request has none. */
-	Optional<String> resolve(HttpServletRequest request);
+    /** The value to send as {@code Authorization}, or empty when this request has none. */
+    Optional<String> resolve(HttpServletRequest request);
 }

@@ -1,5 +1,6 @@
 package com.itways.common.config;
 
+import com.itways.security.annotation.AccountId;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -8,8 +9,6 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import com.itways.security.annotation.AccountId;
 
 @Configuration("swaggerConfig")
 public class SwaggerConfig {

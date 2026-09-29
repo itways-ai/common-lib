@@ -1,13 +1,11 @@
 package com.itways.web.client;
 
+import com.itways.feign.ForwardedAuthorizationResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import com.itways.feign.ForwardedAuthorizationResolver;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * The caller's own credential on the request being served, for an outbound

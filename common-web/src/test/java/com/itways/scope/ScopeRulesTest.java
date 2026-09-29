@@ -8,12 +8,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.itways.common.exception.BusinessException;
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
-
-import com.itways.common.exception.BusinessException;
 
 class ScopeRulesTest {
 

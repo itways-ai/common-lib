@@ -7,25 +7,21 @@ import static com.itways.security.core.TestTokens.WEBHOOK_PREVIOUS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.security.core.TokenVerifier.Failure;
+import com.itways.security.core.TokenVerifier.Kind;
+import com.itways.security.core.TokenVerifier.Result;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
-
 import javax.crypto.spec.SecretKeySpec;
-
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import com.itways.security.core.TokenVerifier.Failure;
-import com.itways.security.core.TokenVerifier.Kind;
-import com.itways.security.core.TokenVerifier.Result;
-
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
 
 class TokenVerifierTest {
 

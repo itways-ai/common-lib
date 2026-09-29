@@ -1,16 +1,13 @@
 package com.itways.security.servlet;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-
-import org.springframework.http.MediaType;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.itways.common.response.ApiResponse;
 import com.itways.web.correlation.CurrentRequestId;
-
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.MediaType;
 
 /**
  * Writes a security error in the platform's {@link ApiResponse} envelope, the

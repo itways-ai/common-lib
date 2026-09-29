@@ -3,13 +3,11 @@ package com.itways.scope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.common.exception.BusinessException;
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.ServletWebRequest;
-
-import com.itways.common.exception.BusinessException;
 
 /** The list a request asks for: scope parameter, else the assistant header (new name, else legacy), else all. */
 @SuppressWarnings("removal") // the legacy header name is what these tests send

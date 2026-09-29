@@ -1,5 +1,8 @@
 package com.itways.security.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itways.security.servlet.ApiResponseAccessDeniedHandler;
+import com.itways.security.servlet.ApiResponseAuthenticationEntryPoint;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -7,10 +10,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itways.security.servlet.ApiResponseAccessDeniedHandler;
-import com.itways.security.servlet.ApiResponseAuthenticationEntryPoint;
 
 /**
  * The shared 401/403 answers (PLT-14) as beans, for a service's

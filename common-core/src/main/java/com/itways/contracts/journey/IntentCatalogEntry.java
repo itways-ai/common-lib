@@ -1,8 +1,7 @@
 package com.itways.contracts.journey;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 
 /**
  * One journey as the intent classifier sees it: the code it routes on and the
@@ -16,9 +15,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record IntentCatalogEntry(
-		Long id,
-		String intent,
-		String name,
-		String description,
-		List<String> exampleUtterances) {
+        Long id,
+        String intent,
+        String name,
+        String description,
+        List<String> exampleUtterances) {
 }

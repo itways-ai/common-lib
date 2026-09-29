@@ -6,8 +6,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.itways.annotation.EnableCommon;
+import com.itways.annotation.EnableRequestCorrelation;
+import com.itways.common.correlation.RequestIds;
+import com.itways.common.exception.BusinessException;
+import com.itways.common.handler.GlobalExceptionHandler;
+import com.itways.security.internal.InternalEndpointGuardConfig;
+import jakarta.servlet.DispatcherType;
 import java.util.UUID;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -22,15 +28,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.itways.annotation.EnableCommon;
-import com.itways.annotation.EnableRequestCorrelation;
-import com.itways.common.correlation.RequestIds;
-import com.itways.common.exception.BusinessException;
-import com.itways.common.handler.GlobalExceptionHandler;
-import com.itways.security.internal.InternalEndpointGuardConfig;
-
-import jakarta.servlet.DispatcherType;
 
 /** How the request-id filter is registered (ARC-25), and the whole servlet path through MockMvc. */
 class RequestCorrelationConfigTest {

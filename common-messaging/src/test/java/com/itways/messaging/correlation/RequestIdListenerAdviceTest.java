@@ -3,19 +3,17 @@ package com.itways.messaging.correlation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.itways.common.correlation.RequestIds;
+import com.rabbitmq.client.impl.LongStringHelper;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.aop.framework.ProxyFactory;
-
-import com.itways.common.correlation.RequestIds;
-import com.rabbitmq.client.impl.LongStringHelper;
 
 /**
  * The listener advice (ARC-25), wrapped around a stand-in for the container's

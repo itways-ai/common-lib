@@ -4,14 +4,13 @@ import com.itways.cache.CacheSettings;
 import com.itways.cache.CacheStore;
 import com.itways.cache.CacheStoreFactory;
 import com.itways.cache.config.CacheProperties;
+import java.time.Duration;
 import org.ehcache.Cache;
 import org.ehcache.CacheManager;
 import org.ehcache.config.builders.CacheConfigurationBuilder;
 import org.ehcache.config.builders.CacheManagerBuilder;
 import org.ehcache.config.builders.ResourcePoolsBuilder;
 import org.ehcache.config.units.EntryUnit;
-
-import java.time.Duration;
 
 public class EhcacheStoreFactory implements CacheStoreFactory {
 

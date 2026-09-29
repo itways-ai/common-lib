@@ -1,7 +1,6 @@
 package com.itways.scope;
 
 import java.util.function.UnaryOperator;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**

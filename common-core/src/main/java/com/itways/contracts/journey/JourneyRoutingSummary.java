@@ -1,8 +1,7 @@
 package com.itways.contracts.journey;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 
 /**
  * One journey's routing text: what it is called and how people ask for it.

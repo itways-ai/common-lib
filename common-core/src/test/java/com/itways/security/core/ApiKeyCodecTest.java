@@ -5,15 +5,12 @@ import static com.itways.security.core.TestTokens.AES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Base64;
-
-import javax.crypto.spec.SecretKeySpec;
-
-import org.junit.jupiter.api.Test;
-
 import com.itways.security.core.ApiKeyCodec.Payload;
 import com.itways.security.core.ApiKeyCodec.Result;
 import com.itways.security.core.ApiKeyCodec.Status;
+import java.util.Base64;
+import javax.crypto.spec.SecretKeySpec;
+import org.junit.jupiter.api.Test;
 
 class ApiKeyCodecTest {
 

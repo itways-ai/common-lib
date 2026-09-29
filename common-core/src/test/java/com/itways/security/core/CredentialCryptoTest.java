@@ -6,9 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Base64;
-
 import javax.crypto.spec.SecretKeySpec;
-
 import org.junit.jupiter.api.Test;
 
 class CredentialCryptoTest {

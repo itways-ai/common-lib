@@ -1,13 +1,10 @@
 package com.itways.web.correlation;
 
-import java.util.Optional;
-
-import org.slf4j.MDC;
-
 import com.itways.common.correlation.RequestIds;
 import com.itways.common.response.ApiResponse;
-
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
+import org.slf4j.MDC;
 
 /**
  * The request id of the work being done on this thread (ARC-25): the request

@@ -1,8 +1,7 @@
 package com.itways.contracts.knowledge;
 
-import java.util.UUID;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.UUID;
 
 /**
  * A question the assistant could not answer well, as conversation-service reports it.

@@ -1,8 +1,7 @@
 package com.itways.contracts.knowledge;
 
-import java.util.UUID;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.UUID;
 
 /**
  * Moves an index to another scope: {@code shared=true} makes it shared, an

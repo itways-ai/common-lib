@@ -1,19 +1,16 @@
 package com.itways.activity.outbox;
 
-import java.time.Instant;
-import java.util.UUID;
-
-import org.slf4j.MDC;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.activity.dto.AccountActivityEvent;
 import com.itways.common.correlation.RequestIds;
-
+import java.time.Instant;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Records activity events in the service's outbox table (PLT-07); the

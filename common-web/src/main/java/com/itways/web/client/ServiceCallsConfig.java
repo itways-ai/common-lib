@@ -1,14 +1,13 @@
 package com.itways.web.client;
 
+import com.itways.feign.ForwardedAuthorizationResolver;
+import com.itways.security.internal.InternalServiceToken;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
-
-import com.itways.feign.ForwardedAuthorizationResolver;
-import com.itways.security.internal.InternalServiceToken;
 
 /**
  * The {@code serviceCalls} bean ({@link ServiceCalls}), imported by

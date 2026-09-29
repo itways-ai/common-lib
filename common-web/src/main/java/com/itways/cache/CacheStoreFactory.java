@@ -4,7 +4,7 @@ public interface CacheStoreFactory {
 
     /**
      * Create or retrieve a cache instance
-     * 
+     *
      * @param cacheName Unique name for the cache
      * @param keyType   Class type of the key
      * @param valueType Class type of the value

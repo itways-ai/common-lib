@@ -12,6 +12,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record StaleIntentEmbedding(
-		Long versionId,
-		String embeddingText) {
+        Long versionId,
+        String embeddingText) {
 }

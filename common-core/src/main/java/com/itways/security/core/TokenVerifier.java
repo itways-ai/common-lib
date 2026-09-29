@@ -1,12 +1,6 @@
 package com.itways.security.core;
 
-import java.security.Key;
-import java.security.PublicKey;
-import java.time.Clock;
-import java.util.Date;
-
 import com.itways.contracts.channels.ChannelWebhookTokenClaims;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -15,6 +9,10 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.LocatorAdapter;
 import io.jsonwebtoken.ProtectedHeader;
 import io.jsonwebtoken.security.SignatureException;
+import java.security.Key;
+import java.security.PublicKey;
+import java.time.Clock;
+import java.util.Date;
 
 /**
  * Verifies the platform's JWTs: user access and refresh tokens (auth-service)

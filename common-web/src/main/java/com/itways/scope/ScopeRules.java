@@ -1,7 +1,6 @@
 package com.itways.scope;
 
 import java.util.UUID;
-
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**

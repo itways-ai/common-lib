@@ -1,7 +1,6 @@
 package com.itways.scope;
 
 import java.util.UUID;
-
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;

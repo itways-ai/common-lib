@@ -3,7 +3,6 @@ package com.itways.contracts.channels;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -33,25 +32,25 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ChannelRuntimeView {
 
-	private UUID id;
-	private String accountId;
-	/**
-	 * The assistant the channel answers as: the tamper-proof source of a
-	 * conversation's scope. Every channel has exactly one and it is never
-	 * shared. Null only on a channel older than that rule whose account had no
-	 * default assistant to give it; the runtime answers on such a channel as the
-	 * account's default assistant if there is one by now, and not at all
-	 * otherwise. A disabled or deleted assistant's channel does not answer.
-	 */
-	private UUID assistantId;
-	private String label;
-	private String type;
-	private String status;
-	private Long defaultJourneyId;
-	private boolean executionSessionEnabled;
-	private Map<String, Object> channelSettings;
-	/** Raised each time the channel's webhook URL is rotated; older URLs are refused. */
-	private int webhookVersion;
-	private LocalDateTime createdAt;
-	private LocalDateTime updatedAt;
+    private UUID id;
+    private String accountId;
+    /**
+     * The assistant the channel answers as: the tamper-proof source of a
+     * conversation's scope. Every channel has exactly one and it is never
+     * shared. Null only on a channel older than that rule whose account had no
+     * default assistant to give it; the runtime answers on such a channel as the
+     * account's default assistant if there is one by now, and not at all
+     * otherwise. A disabled or deleted assistant's channel does not answer.
+     */
+    private UUID assistantId;
+    private String label;
+    private String type;
+    private String status;
+    private Long defaultJourneyId;
+    private boolean executionSessionEnabled;
+    private Map<String, Object> channelSettings;
+    /** Raised each time the channel's webhook URL is rotated; older URLs are refused. */
+    private int webhookVersion;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

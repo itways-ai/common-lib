@@ -4,6 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.activity.dto.ActivityCategory;
+import com.itways.activity.dto.ActivitySeverity;
+import com.itways.activity.outbox.ActivityOutbox;
+import com.itways.activity.outbox.ActivityOutboxConfig;
+import com.itways.activity.outbox.ActivityOutboxProperties;
+import com.itways.activity.outbox.ActivityOutboxRelay;
+import com.itways.activity.outbox.ActivityOutboxStore;
+import com.itways.activity.outbox.RabbitConfirmedSender;
+import com.itways.annotation.EnableActivity;
+import com.itways.common.correlation.RequestIds;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -19,7 +31,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,19 +60,6 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itways.activity.dto.AccountActivityEvent;
-import com.itways.activity.dto.ActivityCategory;
-import com.itways.activity.dto.ActivitySeverity;
-import com.itways.activity.outbox.ActivityOutbox;
-import com.itways.activity.outbox.ActivityOutboxConfig;
-import com.itways.activity.outbox.ActivityOutboxProperties;
-import com.itways.activity.outbox.ActivityOutboxRelay;
-import com.itways.activity.outbox.ActivityOutboxStore;
-import com.itways.activity.outbox.RabbitConfirmedSender;
-import com.itways.annotation.EnableActivity;
-import com.itways.common.correlation.RequestIds;
 
 /**
  * The activity outbox (PLT-07) against a real Postgres and RabbitMQ: a rollback

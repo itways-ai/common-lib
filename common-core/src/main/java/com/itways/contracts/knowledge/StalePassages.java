@@ -1,8 +1,7 @@
 package com.itways.contracts.knowledge;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 
 /**
  * One batch of an account's passages whose vector another embedding model
@@ -18,8 +17,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record StalePassages(List<Passage> passages, long remaining) {
 
-	/** A passage to embed again: its id and the text its vector is made from. */
-	@JsonIgnoreProperties(ignoreUnknown = true)
-	public record Passage(long id, String text) {
-	}
+    /** A passage to embed again: its id and the text its vector is made from. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Passage(long id, String text) {
+    }
 }

@@ -2,6 +2,10 @@ package com.itways.feign;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.common.correlation.RequestIds;
+import com.itways.security.internal.InternalServiceToken;
+import feign.RequestInterceptor;
+import feign.RequestTemplate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,12 +16,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import com.itways.common.correlation.RequestIds;
-import com.itways.security.internal.InternalServiceToken;
-
-import feign.RequestInterceptor;
-import feign.RequestTemplate;
 
 /**
  * The service token on every Feign call (conversation-service's calls to account, journey,

@@ -2,6 +2,7 @@ package com.itways.security.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.annotation.EnableInternalEndpointGuard;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
@@ -10,8 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import com.itways.annotation.EnableInternalEndpointGuard;
 
 /** How {@code @EnableInternalEndpointGuard} registers the filter, and the knobs. */
 class InternalEndpointGuardConfigTest {

@@ -1,9 +1,8 @@
 package com.itways.contracts.knowledge;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * Gaps to resolve or dismiss.

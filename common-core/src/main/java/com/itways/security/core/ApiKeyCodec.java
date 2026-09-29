@@ -2,7 +2,6 @@ package com.itways.security.core;
 
 import java.security.GeneralSecurityException;
 import java.util.Objects;
-
 import javax.crypto.spec.SecretKeySpec;
 
 /**

@@ -1,5 +1,7 @@
 package com.itways.activity.outbox;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itways.activity.dto.AccountActivityEvent;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,14 +10,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.itways.activity.dto.AccountActivityEvent;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Sends the outbox rows to RabbitMQ (PLT-07).
