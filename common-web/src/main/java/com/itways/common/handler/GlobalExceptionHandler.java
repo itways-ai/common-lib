@@ -4,6 +4,7 @@ import com.itways.common.constants.ErrorCodes;
 import com.itways.common.exception.BusinessException;
 import com.itways.common.response.ApiResponse;
 import com.itways.security.core.SecurityMessages;
+import com.itways.web.correlation.CurrentRequestId;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -77,6 +78,12 @@ import java.util.UUID;
  * and code {@code INTERNAL_SERVER_ERROR}, and the real message is logged with
  * the reference (the account/auth rule); when {@code false} the thrower's
  * message is returned as it always was.
+ *
+ * <p><b>Request id (ARC-25).</b> Every error body built here carries the
+ * current request id as {@code reference} when there is one
+ * ({@link CurrentRequestId}; the field is left out otherwise), and the
+ * reference of a 500 is that same id, so the caller, the response header and
+ * the log lines of every service the request touched agree.
  */
 @Slf4j
 @RestControllerAdvice
@@ -125,7 +132,7 @@ public class GlobalExceptionHandler {
                     ex.getMessage());
         }
         return ResponseEntity.status(ex.getHttpStatus())
-                .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode()));
+                .body(CurrentRequestId.stamp(ApiResponse.error(ex.getMessage(), ex.getErrorCode())));
     }
 
     // ── Validation ─────────────────────────────────────────────────────────────
@@ -213,8 +220,8 @@ public class GlobalExceptionHandler {
             headers.setAllow(ex.getSupportedHttpMethods());
         }
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(headers)
-                .body(ApiResponse.error("Method " + ex.getMethod() + " is not supported on this path",
-                        "METHOD_NOT_ALLOWED"));
+                .body(CurrentRequestId.stamp(ApiResponse.error(
+                        "Method " + ex.getMethod() + " is not supported on this path", "METHOD_NOT_ALLOWED")));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -271,27 +278,30 @@ public class GlobalExceptionHandler {
 
     // ── Hooks for subclasses ───────────────────────────────────────────────────
 
-    /** The 400 {@code VALIDATION_ERROR} answer: field → message in {@code data}. */
+    /** The 400 {@code VALIDATION_ERROR} answer: field → message in {@code data}; the request id as {@code reference}. */
     protected ResponseEntity<ApiResponse<Map<String, String>>> validationFailed(Map<String, String> errors) {
         ApiResponse<Map<String, String>> response = ApiResponse.success(VALIDATION_FAILED_MESSAGE, errors);
         response.setStatus("error");
         response.setErrorCode(VALIDATION_ERROR);
-        return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.badRequest().body(CurrentRequestId.stamp(response));
     }
 
-    /** An error answer in the envelope; every fixed-text handler ends here. */
+    /** An error answer in the envelope, with the request id as {@code reference}; every fixed-text handler ends here. */
     protected ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message, String errorCode) {
         return error((HttpStatusCode) status, message, errorCode);
     }
 
     /** As {@link #error(HttpStatus, String, String)}, for a status outside the {@link HttpStatus} enum. */
     protected ResponseEntity<ApiResponse<Void>> error(HttpStatusCode status, String message, String errorCode) {
-        return ResponseEntity.status(status).body(ApiResponse.error(message, errorCode));
+        return ResponseEntity.status(status).body(CurrentRequestId.stamp(ApiResponse.error(message, errorCode)));
     }
 
-    /** The reference a caller can quote from a 5xx body; the log carries the same one. A UUID. */
+    /**
+     * The reference a caller can quote from a 5xx body; the log carries the same
+     * one. The current request id when there is one (ARC-25), a UUID otherwise.
+     */
     protected String newReference() {
-        return UUID.randomUUID().toString();
+        return CurrentRequestId.get().orElseGet(() -> UUID.randomUUID().toString());
     }
 
     /**

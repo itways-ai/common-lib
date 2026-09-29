@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.itways.common.response.ApiResponse;
+import com.itways.web.correlation.CurrentRequestId;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -52,7 +53,9 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * Registered by {@link InternalEndpointGuardConfig} ahead of Spring Security,
  * so a proxied caller learns nothing from a 401/403 either. A response that is
- * already committed is left alone.
+ * already committed is left alone. Like every error body, the 404 quotes the
+ * request id as {@code reference} when there is one (ARC-25; the request-id
+ * filter runs first), as the real 404 does.
  */
 @Slf4j
 public class InternalEndpointGuard extends OncePerRequestFilter {
@@ -134,7 +137,8 @@ public class InternalEndpointGuard extends OncePerRequestFilter {
         response.setStatus(HttpStatus.NOT_FOUND.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper().writeValue(response.getOutputStream(), ApiResponse.error(NOT_FOUND_MESSAGE, NOT_FOUND_CODE));
+        objectMapper().writeValue(response.getOutputStream(),
+                CurrentRequestId.stamp(ApiResponse.error(NOT_FOUND_MESSAGE, NOT_FOUND_CODE)));
     }
 
     /**

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -28,6 +29,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.itways.common.correlation.RequestIds;
 import com.itways.feign.ForwardedAuthorizationResolver;
 import com.itways.security.internal.InternalServiceToken;
 import com.sun.net.httpserver.HttpServer;
@@ -74,6 +76,7 @@ class ServiceCallsTest {
     void stop() {
         server.stop(0);
         RequestContextHolder.resetRequestAttributes();
+        MDC.clear();
     }
 
     private static ServiceCalls calls(String token, RestClient.Builder bootBuilder,
@@ -251,5 +254,37 @@ class ServiceCallsTest {
         new WebApplicationContextRunner()
                 .withUserConfiguration(OwnServiceCalls.class, App.class, ServiceCallsConfig.class)
                 .run(context -> assertThat(context).hasNotFailed().hasSingleBean(ServiceCalls.class));
+    }
+
+    // ── Request id (ARC-25) ────────────────────────────────────────────────────
+
+    @Test
+    void sendsTheCurrentRequestIdBesideTheCredential() {
+        serving("Bearer caller", null);
+        MDC.put(RequestIds.MDC_KEY, "req-rest-1");
+
+        call(calls(TOKEN, null, null).client(base));
+
+        assertThat(seen).containsEntry("x-request-id", "req-rest-1").containsEntry("authorization", "Bearer caller");
+    }
+
+    @Test
+    void sendsItOutsideARequestTooAndNothingWithoutOne() {
+        call(calls(TOKEN, null, null).client(base));
+        assertThat(seen).doesNotContainKey("x-request-id");
+
+        MDC.put(RequestIds.MDC_KEY, "req-rest-2");
+        call(calls(TOKEN, null, null).client(base));
+        assertThat(seen).containsEntry("x-request-id", "req-rest-2");
+    }
+
+    @Test
+    void anIdTheCallAlreadyNamesIsKept() {
+        MDC.put(RequestIds.MDC_KEY, "req-rest-3");
+
+        calls(TOKEN, null, null).client(base).get().uri("/api/x").header(RequestIds.HEADER, "explicit").retrieve()
+                .toBodilessEntity();
+
+        assertThat(seen).containsEntry("x-request-id", "explicit");
     }
 }

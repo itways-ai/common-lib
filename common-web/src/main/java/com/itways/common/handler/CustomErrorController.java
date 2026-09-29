@@ -1,6 +1,7 @@
 package com.itways.common.handler;
 
 import com.itways.common.response.ApiResponse;
+import com.itways.web.correlation.CurrentRequestId;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>It never echoes the exception or container message (AS-13): those carried
  * class names, SQL and stack details to the client. A 5xx gets a fixed text and
  * the exception goes to the log; any other status gets its reason phrase.
+ * The body quotes the request id as {@code reference} when there is one
+ * (ARC-25).
  */
 @Slf4j
 @RestController("customErrorController")
@@ -63,6 +66,7 @@ public class CustomErrorController implements ErrorController {
             errorCode = "FRAMEWORK_ERROR_" + httpStatus.value();
         }
 
-        return ResponseEntity.status(httpStatus).body(ApiResponse.error(errorMessage, errorCode));
+        return ResponseEntity.status(httpStatus)
+                .body(CurrentRequestId.stamp(ApiResponse.error(errorMessage, errorCode), request));
     }
 }

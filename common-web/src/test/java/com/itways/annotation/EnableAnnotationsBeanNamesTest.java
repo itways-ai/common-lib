@@ -45,7 +45,9 @@ class EnableAnnotationsBeanNamesTest {
 
                     // @EnableCommon
                     assertThat(context).hasBean("globalExceptionHandler").hasBean("dataAccessExceptionHandler")
-                            .hasBean("customErrorController").hasBean("swaggerConfig").hasBean("timeConfig");
+                            .hasBean("customErrorController").hasBean("swaggerConfig").hasBean("timeConfig")
+                            // ARC-25: request correlation comes with it
+                            .hasBean("requestCorrelationConfig").hasBean("requestIdFilter");
 
                     // @EnableEncryption
                     assertThat(context).hasBean("rsaService");

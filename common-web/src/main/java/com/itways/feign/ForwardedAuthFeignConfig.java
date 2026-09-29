@@ -6,9 +6,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.itways.common.correlation.RequestIds;
 import com.itways.security.internal.InternalServiceToken;
 import com.itways.web.client.CallerCredentials;
 import com.itways.web.client.ServiceCalls;
+import com.itways.web.correlation.CurrentRequestId;
 
 import feign.RequestInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +35,11 @@ import lombok.extern.slf4j.Slf4j;
  * It is sent even without a current request (scheduled jobs, consumers).
  *
  * <p>
+ * The current request id goes along as {@code X-Request-Id} (ARC-25;
+ * {@link CurrentRequestId}, so also from a message listener), unless the
+ * call already names one.
+ *
+ * <p>
  * Opt in with {@code @EnableForwardedAuth}; the class is not auto-configured,
  * because a service without Feign has no {@code RequestInterceptor} to give
  * (Feign is an optional dependency of this module).
@@ -49,6 +56,9 @@ public class ForwardedAuthFeignConfig {
 		return template -> {
 			if (!serviceToken.isEmpty()) {
 				template.header(InternalServiceToken.HEADER, serviceToken);
+			}
+			if (!template.headers().containsKey(RequestIds.HEADER)) {
+				CurrentRequestId.get().ifPresent(id -> template.header(RequestIds.HEADER, id));
 			}
 			HttpServletRequest request = CallerCredentials.currentRequest();
 			if (request == null) {

@@ -6,19 +6,22 @@ import org.springframework.context.annotation.Import;
 import com.itways.common.handler.CustomErrorController;
 import com.itways.common.handler.DataAccessExceptionHandler;
 import com.itways.common.handler.GlobalExceptionHandler;
+import com.itways.web.correlation.RequestCorrelationConfig;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * What {@code @EnableCommon} brings: the shared error handling and the
- * OpenAPI and time configuration. Listed explicitly (it used to component-scan
- * {@code com.itways.common}); the bean names are the ones the scan gave.
+ * What {@code @EnableCommon} brings: the shared error handling, the
+ * OpenAPI and time configuration, and request correlation (ARC-25; the
+ * {@code requestIdFilter}, off with {@code itways.request-id.enabled=false}).
+ * Listed explicitly (it used to component-scan {@code com.itways.common}); the
+ * bean names are the ones the scan gave.
  */
 @Slf4j
 @Configuration
 @Import({ GlobalExceptionHandler.class, DataAccessExceptionHandler.class, CustomErrorController.class,
-		SwaggerConfig.class, TimeConfig.class })
+		SwaggerConfig.class, TimeConfig.class, RequestCorrelationConfig.class })
 public class CommonConfig {
 	
 	@PostConstruct

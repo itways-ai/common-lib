@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -12,6 +13,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.itways.common.correlation.RequestIds;
 import com.itways.security.internal.InternalServiceToken;
 
 import feign.RequestInterceptor;
@@ -29,6 +31,7 @@ class ForwardedAuthFeignConfigTest {
     @AfterEach
     void noRequest() {
         RequestContextHolder.resetRequestAttributes();
+        MDC.clear();
     }
 
     private static RequestTemplate call(String internalToken) {
@@ -66,5 +69,41 @@ class ForwardedAuthFeignConfigTest {
         assertThat(template.headers().get("Authorization")).containsExactly("Bearer caller");
         assertThat(template.headers().get(InternalServiceToken.HEADER)).containsExactly(SERVICE_TOKEN);
         assertThat(output.getAll()).doesNotContain(SERVICE_TOKEN);
+    }
+
+    // ── Request id (ARC-25) ────────────────────────────────────────────────────
+
+    @Test
+    void sendsTheCurrentRequestIdInsideARequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer caller");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        MDC.put(RequestIds.MDC_KEY, "req-feign-1");
+
+        RequestTemplate template = call(SERVICE_TOKEN);
+
+        assertThat(template.headers().get(RequestIds.HEADER)).containsExactly("req-feign-1");
+        assertThat(template.headers().get("Authorization")).containsExactly("Bearer caller");
+    }
+
+    @Test
+    void sendsItOutsideARequestTooSuchAsFromAMessageListener() {
+        MDC.put(RequestIds.MDC_KEY, "req-feign-2");
+
+        assertThat(call("").headers().get(RequestIds.HEADER)).containsExactly("req-feign-2");
+    }
+
+    @Test
+    void sendsNoneWithoutACurrentIdAndKeepsOneTheCallAlreadyHas() {
+        assertThat(call(SERVICE_TOKEN).headers()).doesNotContainKey(RequestIds.HEADER);
+
+        MDC.put(RequestIds.MDC_KEY, "req-feign-3");
+        RequestInterceptor interceptor = new ForwardedAuthFeignConfig().forwardedAuthRequestInterceptor(
+                new StaticListableBeanFactory().getBeanProvider(ForwardedAuthorizationResolver.class), "");
+        RequestTemplate template = new RequestTemplate();
+        template.header("x-request-id", "explicit");
+        interceptor.apply(template);
+
+        assertThat(template.headers().get(RequestIds.HEADER)).containsExactly("explicit");
     }
 }

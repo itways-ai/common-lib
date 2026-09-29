@@ -8,12 +8,14 @@ import org.springframework.http.MediaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.itways.common.response.ApiResponse;
+import com.itways.web.correlation.CurrentRequestId;
 
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Writes a security error in the platform's {@link ApiResponse} envelope, the
- * shape every controller error and the api-gateway's AUTH_401 already have.
+ * shape every controller error and the api-gateway's AUTH_401 already have,
+ * with the request id as {@code reference} when there is one (ARC-25).
  */
 final class SecurityErrorWriter {
 
@@ -36,6 +38,7 @@ final class SecurityErrorWriter {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        objectMapper.writeValue(response.getOutputStream(), ApiResponse.error(message, errorCode));
+        objectMapper.writeValue(response.getOutputStream(),
+                CurrentRequestId.stamp(ApiResponse.error(message, errorCode)));
     }
 }

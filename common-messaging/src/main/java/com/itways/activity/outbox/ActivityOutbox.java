@@ -3,6 +3,7 @@ package com.itways.activity.outbox;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.slf4j.MDC;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -10,6 +11,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.common.correlation.RequestIds;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,6 +31,12 @@ import lombok.extern.slf4j.Slf4j;
  * Delivery is at least once: a crash between the broker's confirmation and the
  * {@code sent_at} update sends the event again, with the same {@code eventId};
  * account-service drops the repeat.
+ *
+ * <p>
+ * An event recorded without a {@code requestId} gets the one of the request or
+ * message being handled (the logging context's {@link RequestIds#MDC_KEY},
+ * ARC-25), so the relay, which sends it later on its own thread, still sends
+ * it with the {@code x-request-id} header.
  */
 @Slf4j
 public class ActivityOutbox {
@@ -108,6 +116,12 @@ public class ActivityOutbox {
         }
         if (event.getOccurredAt() == null) {
             event.setOccurredAt(Instant.now());
+        }
+        if (event.getRequestId() == null) {
+            String current = MDC.get(RequestIds.MDC_KEY);
+            if (RequestIds.isWellFormed(current)) {
+                event.setRequestId(current);
+            }
         }
         return event;
     }

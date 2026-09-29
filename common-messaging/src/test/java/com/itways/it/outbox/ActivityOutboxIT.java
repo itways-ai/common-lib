@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.Binding;
@@ -60,6 +61,7 @@ import com.itways.activity.outbox.ActivityOutboxRelay;
 import com.itways.activity.outbox.ActivityOutboxStore;
 import com.itways.activity.outbox.RabbitConfirmedSender;
 import com.itways.annotation.EnableActivity;
+import com.itways.common.correlation.RequestIds;
 
 /**
  * The activity outbox (PLT-07) against a real Postgres and RabbitMQ: a rollback
@@ -205,6 +207,32 @@ class ActivityOutboxIT {
 
         assertThat(relay.relayPending()).isZero();
         assertThat(receiveAll(Duration.ofMillis(800))).isEmpty();
+    }
+
+    /** ARC-25: the relay sends later, on its own thread; the id recorded with the event goes with it. */
+    @Test
+    void theRequestIdRecordedWithAnEventTravelsAsTheMessageHeader() {
+        AccountActivityEvent withId = event();
+        AccountActivityEvent withoutId = event();
+        MDC.put(RequestIds.MDC_KEY, "req-it-1");
+        try {
+            transaction().executeWithoutResult(status -> outbox.record(withId));
+        } finally {
+            MDC.remove(RequestIds.MDC_KEY);
+        }
+        transaction().executeWithoutResult(status -> outbox.record(withoutId));
+
+        await().atMost(Duration.ofSeconds(10))
+                .until(() -> sentAt(withId.getEventId()) != null && sentAt(withoutId.getEventId()) != null);
+        Map<UUID, Message> received = receiveAll(Duration.ofSeconds(1)).stream()
+                .collect(Collectors.toMap(this::eventId, Function.identity()));
+
+        Message carried = received.get(withId.getEventId());
+        assertThat((String) carried.getMessageProperties().getHeader(RequestIds.AMQP_HEADER)).isEqualTo("req-it-1");
+        assertThat(read(carried).get("requestId")).isEqualTo("req-it-1");
+        Message plain = received.get(withoutId.getEventId());
+        assertThat(plain.getMessageProperties().getHeaders()).doesNotContainKey(RequestIds.AMQP_HEADER);
+        assertThat(read(plain)).doesNotContainKey("requestId");
     }
 
     @Test

@@ -19,6 +19,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.ObjectProvider;
 
 import com.itways.activity.dto.AccountActivityEvent;
+import com.itways.common.correlation.RequestIds;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,7 +38,9 @@ import lombok.extern.slf4j.Slf4j;
  * The sender has its own {@link RabbitTemplate} on that connection factory,
  * {@code mandatory}, with the service template's message converter: its
  * callbacks and flags do not touch the service's template. Each message carries
- * a {@link CorrelationData} with the event id. A nack, a return (no queue bound,
+ * a {@link CorrelationData} with the event id, and the event's
+ * {@code requestId} as the {@code x-request-id} header when it has one (ARC-25).
+ * A nack, a return (no queue bound,
  * e.g. {@code account.activity.queue} deleted), a timeout or a closed channel
  * fails the whole batch; the relay keeps the rows and tries again later
  * ({@link ActivityBatchSender}).
@@ -91,10 +94,14 @@ public class RabbitConfirmedSender implements ActivityBatchSender, DisposableBea
             List<CorrelationData> pending = new ArrayList<>(events.size());
             for (AccountActivityEvent event : events) {
                 String id = String.valueOf(event.getEventId());
+                String requestId = event.getRequestId();
                 CorrelationData correlation = new CorrelationData(id);
                 template.convertAndSend(AccountActivityEvent.EXCHANGE_NAME, AccountActivityEvent.ROUTING_KEY, event,
                         message -> {
                             message.getMessageProperties().setMessageId(id);
+                            if (RequestIds.isWellFormed(requestId)) {
+                                message.getMessageProperties().setHeader(RequestIds.AMQP_HEADER, requestId);
+                            }
                             return message;
                         }, correlation);
                 pending.add(correlation);

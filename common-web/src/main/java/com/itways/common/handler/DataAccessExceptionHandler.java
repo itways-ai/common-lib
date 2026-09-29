@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.itways.common.response.ApiResponse;
+import com.itways.web.correlation.CurrentRequestId;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,7 +21,8 @@ import lombok.extern.slf4j.Slf4j;
  * Maps {@link DataIntegrityViolationException} — usually a unique constraint
  * lost to a concurrent request — to 409 with a generic message (AS-13). The
  * driver's message names tables and constraints, so it only goes to the log,
- * under a reference the caller can quote.
+ * under a reference the caller can quote: the request id when there is one
+ * (ARC-25, also the body's {@code reference}), a UUID otherwise.
  *
  * <p>A class of its own, not a method on {@link GlobalExceptionHandler}: the
  * {@code @ConditionalOnClass} (evaluated from bytecode metadata, before the
@@ -45,12 +47,12 @@ public class DataAccessExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
-        String reference = UUID.randomUUID().toString();
+        String reference = CurrentRequestId.get().orElseGet(() -> UUID.randomUUID().toString());
         Throwable cause = ex.getMostSpecificCause();
         log.warn("Data integrity violation (reference {}): {}: {}", reference, cause.getClass().getSimpleName(),
                 cause.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(CurrentRequestId.stamp(ApiResponse.error(
                 "The request conflicts with existing data; reload and try again (reference " + reference + ")",
-                DATA_CONFLICT));
+                DATA_CONFLICT)));
     }
 }

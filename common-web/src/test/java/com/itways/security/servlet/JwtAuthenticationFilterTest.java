@@ -21,6 +21,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -71,6 +72,7 @@ class JwtAuthenticationFilterTest {
 	@AfterEach
 	void clearContext() {
 		SecurityContextHolder.clearContext();
+		MDC.clear();
 	}
 
 	@Test
@@ -117,6 +119,18 @@ class JwtAuthenticationFilterTest {
 		assertThat(outcome.response().getStatus()).isEqualTo(401);
 		assertThat(outcome.body().get("errorCode").asText()).isEqualTo("AUTH_401");
 		assertThat(outcome.authentication()).isNull();
+	}
+
+	/** ARC-25: the filter's own 401 quotes the request id, like every error body. */
+	@Test
+	void aRefusalQuotesTheRequestIdWhenThereIsOne() throws Exception {
+		assertThat(run(tokens.generateRefreshToken("user@example.test")).body().has("reference")).isFalse();
+
+		MDC.put(com.itways.common.correlation.RequestIds.MDC_KEY, "req-jwt-1");
+		Outcome outcome = run(tokens.generateRefreshToken("user@example.test"));
+
+		assertThat(outcome.response().getStatus()).isEqualTo(401);
+		assertThat(outcome.body().get("reference").asText()).isEqualTo("req-jwt-1");
 	}
 
 	@Test

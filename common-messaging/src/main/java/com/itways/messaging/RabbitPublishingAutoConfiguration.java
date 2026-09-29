@@ -10,11 +10,15 @@ import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitTemplateCustomizer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
 import com.itways.contracts.account.AccountEvents;
+import com.itways.messaging.correlation.RequestIdListenerAdvice;
+import com.itways.messaging.correlation.RequestIdListenerAdviceRegistrar;
+import com.itways.messaging.correlation.RequestIdPublishPostProcessor;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -37,6 +41,16 @@ import lombok.extern.slf4j.Slf4j;
  * {@value #QUIET_EXCHANGES_PROPERTY} (default {@value AccountEvents#EXCHANGE}:
  * a routing key without a subscriber, such as {@code assistant.created}); its
  * returns are logged at debug instead of warn.
+ *
+ * <p>
+ * Request correlation (ARC-25), unless {@value #REQUEST_ID_ENABLED_PROPERTY}
+ * is {@code false}: the {@code requestIdPublishing} customizer puts the request
+ * id of the logging context on every message Boot's template publishes
+ * ({@link RequestIdPublishPostProcessor}), and every listener container factory
+ * bean gets the {@link RequestIdListenerAdvice}, which puts a message's id back
+ * in the logging context while its listener runs
+ * ({@link RequestIdListenerAdviceRegistrar}). The advice is also a bean,
+ * {@code requestIdListenerAdvice}, for containers built by hand.
  */
 @Slf4j
 @AutoConfiguration(before = RabbitAutoConfiguration.class)
@@ -45,6 +59,9 @@ public class RabbitPublishingAutoConfiguration {
 
     /** Comma-separated exchanges whose unroutable messages are expected. */
     public static final String QUIET_EXCHANGES_PROPERTY = "itways.rabbitmq.returns.quiet-exchanges";
+
+    /** {@code false} switches the request id off on published and consumed messages (default {@code true}). */
+    public static final String REQUEST_ID_ENABLED_PROPERTY = "itways.request-id.messaging.enabled";
 
     @Bean
     @ConditionalOnMissingBean(name = "publishOutcomeLogging")
@@ -55,6 +72,29 @@ public class RabbitPublishingAutoConfiguration {
             template.setConfirmCallback(RabbitPublishingAutoConfiguration::logNack);
             template.setReturnsCallback(returned -> logReturn(returned, quiet));
         };
+    }
+
+    /** The request id of the logging context on every message Boot's template publishes (ARC-25). */
+    @Bean
+    @ConditionalOnMissingBean(name = "requestIdPublishing")
+    @ConditionalOnProperty(name = REQUEST_ID_ENABLED_PROPERTY, matchIfMissing = true)
+    public RabbitTemplateCustomizer requestIdPublishing() {
+        return template -> template.addBeforePublishPostProcessors(new RequestIdPublishPostProcessor());
+    }
+
+    /** The listener advice, for a container a service builds by hand (the factories get it anyway). */
+    @Bean
+    @ConditionalOnMissingBean(RequestIdListenerAdvice.class)
+    @ConditionalOnProperty(name = REQUEST_ID_ENABLED_PROPERTY, matchIfMissing = true)
+    public RequestIdListenerAdvice requestIdListenerAdvice() {
+        return new RequestIdListenerAdvice();
+    }
+
+    /** Adds the listener advice to every listener container factory bean; static, as a post-processor must be. */
+    @Bean
+    @ConditionalOnProperty(name = REQUEST_ID_ENABLED_PROPERTY, matchIfMissing = true)
+    public static RequestIdListenerAdviceRegistrar requestIdListenerAdviceRegistrar() {
+        return new RequestIdListenerAdviceRegistrar();
     }
 
     static void logNack(CorrelationData correlation, boolean ack, String cause) {

@@ -76,7 +76,8 @@ bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 
 | Annotation | Module | Imports | What the service gets |
 | --- | --- | --- | --- |
-| `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC). `ApiResponse` / `PageResponse` are plain classes in common-core. |
+| `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC), and request correlation (`RequestCorrelationConfig`, the `requestIdFilter`; see "Request correlation"). `ApiResponse` / `PageResponse` are plain classes in common-core. |
+| `@EnableRequestCorrelation` | common-web | `web.correlation.RequestCorrelationConfig` | The request-id filter alone, for a servlet service without `@EnableCommon` |
 | `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on) |
 | `@EnableInternalEndpointGuard` | common-web | `security.internal.InternalEndpointGuardConfig` | The `/internal/` guard filter (`internalEndpointGuard`, see "Shared helpers"); needs `@EnableCustomSecurity` |
 | `@EnableMailSecrets` | common-web | `encryption.MailSecretsConfig` | The `MailSecrets` bean from `MAIL_SECRETS_KEY`, required unless `itways.mail-secrets.required=false` |
@@ -106,7 +107,8 @@ is now Spring Boot's.
 - common-web, `META-INF/spring.factories`: `security.config.GeneratedUserFilter`
   leaves out Spring Boot's `UserDetailsServiceAutoConfiguration`, see below.
 - common-messaging, `AutoConfiguration.imports`:
-  `messaging.RabbitPublishingAutoConfiguration` logs publisher nacks and returns.
+  `messaging.RabbitPublishingAutoConfiguration` logs publisher nacks and returns,
+  and carries the request id over RabbitMQ (ARC-25, see "Request correlation").
 - common-messaging, `spring.factories`: `messaging.RabbitPublishingDefaults`
   (an `EnvironmentPostProcessor`) turns on correlated publisher confirms, returns
   and mandatory publishing for every service's RabbitMQ connection (PLT-30); a
@@ -121,9 +123,11 @@ is now Spring Boot's.
 | `common.response`, `common.constants`, `common.exception` | core | Envelope (`ApiResponse`, `PageResponse`), error codes, `BusinessException`, `InvalidApiKeyException`. |
 | `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). `IpLiterals`, `TrustedProxies` and `ClientIp`: the client-IP rule behind our proxies (the gateway's, shared). |
 | `common.util` | core | `UtcDateTimes`. |
+| `common.correlation` | core | `RequestIds`: the request-id rule (names, well-formedness, accept or generate) the gateway and the services share. |
 | `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`; `Sessions` (the USER_SESSION rule and the details keys) and `ClientIpResolver` (the servlet side of `ClientIp`). |
 | `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). `InternalEndpointGuard` / `InternalEndpointGuardConfig`: the filter that keeps those routes off the public edge (`@EnableInternalEndpointGuard`). |
 | `web.client` | web | `ServiceCalls`, `ForwardedCallerInterceptor`, `CallerCredentials`: `RestClient`s to other platform services that carry the service token and the caller's credential. |
+| `web.correlation` | web | `RequestIdFilter`, `CurrentRequestId`, `RequestCorrelationConfig`: the request id of the request being served. |
 | `web.net` | web | `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads`: calls to tenant-supplied URLs pinned to vetted public addresses, and size-capped downloads (needs Apache HttpClient 5, optional here). |
 | `security.config`, `security.resolver`, `security.annotation` | web | Security wiring, `@AccountId`. |
 | `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`. |
@@ -133,6 +137,7 @@ is now Spring Boot's.
 | `feign`, `freemarker`, `jpa` | web | The opt-in integrations above. |
 | `annotation` | web + messaging | The `@Enable*` annotations; `EnableActivity` and `EnableNotifications` ship in common-messaging, the rest in common-web. |
 | `amqp`, `messaging` | messaging | RabbitMQ JSON conversion; publisher confirms and returns; `DeadLetterQueueGauge` (a queue's depth as a Micrometer gauge). |
+| `messaging.correlation` | messaging | `RequestIdPublishPostProcessor`, `RequestIdListenerAdvice`, `RequestIdListenerAdviceRegistrar`: the request id on published messages and in listeners. |
 | `notification`, `activity` | messaging | Notification and activity publishers and their DTOs. |
 | `activity.outbox` | messaging | The transactional outbox for activity events: `ActivityOutbox`, `ActivityOutboxRelay`, `ActivityOutboxStore`, `RabbitConfirmedSender`, the health indicator and gauges. |
 
@@ -195,7 +200,7 @@ The rules, and what changes for an adopter:
   the startup, as in the gateway. Account and auth keep reading their own keys
   until they adopt.
 - **Exception handler.** Defaults are unchanged. Hooks: `error(status, message,
-  code)`, `validationFailed(map)`, `newReference()` (a UUID),
+  code)`, `validationFailed(map)`, `newReference()` (the request id, else a UUID; ARC-25),
   `clientErrorCode(status)` (`HTTP_<n>`; auth overrides to `HttpStatus.name()`),
   `hideServerErrorMessages()` (`itways.errors.hide-server-error-messages`,
   default `false`: when `true` a 5xx `BusinessException` answers its own status
@@ -236,6 +241,96 @@ The rules, and what changes for an adopter:
   cookies are never kept and waiting for a pooled connection is bounded by the
   connect timeout; an overload takes a `PoolSize`. `BoundedDownloads` is as it
   was.
+
+## Request correlation (ARC-25)
+
+One id follows a user request through every service it touches, so the log lines
+of all of them can be found together and a caller can quote the id of a failed
+request. The rule is common-core's `RequestIds`: header `X-Request-Id`, logging
+key `requestId`, AMQP header `x-request-id`; an incoming id is kept when it is 1
+to 64 characters of `[A-Za-z0-9._-]` (after trimming), otherwise a new random
+UUID is used, so a forged value cannot inject text into a log line.
+
+How it flows: filter → MDC → RestClient / Feign header → AMQP header → listener
+MDC → error envelope `reference`.
+
+1. **Gateway.** The api-gateway (WebFlux) accepts or creates the id with
+   `RequestIds.accept(...)` and sends it on to the service as `X-Request-Id`
+   (GW-12, in the gateway's repository).
+2. **Servlet filter.** `RequestIdFilter` applies the same rule to the incoming
+   header, echoes the id as the response's `X-Request-Id` before the rest of the
+   chain runs (so it is there however the response is committed), stores it as the
+   request attribute `com.itways.requestId` and puts it in the SLF4J MDC as
+   `requestId` for the duration of the request; the previous value is restored
+   afterwards. It is registered as `requestIdFilter` on `/*` first of all filters
+   (`Ordered.HIGHEST_PRECEDENCE`; the internal-endpoint guard is at `+10`, Spring
+   Security at -100) for request, async and error dispatches; a re-dispatch keeps
+   the id of the first pass. `CurrentRequestId.get()` reads the id.
+3. **Outbound HTTP.** `ForwardedCallerInterceptor` (every `ServiceCalls` client)
+   and the Feign interceptor of `@EnableForwardedAuth` send the current id as
+   `X-Request-Id` unless the call names one already, also outside a request (a
+   listener that has one).
+4. **Publishing.** The `requestIdPublishing` customizer adds a
+   `RequestIdPublishPostProcessor` to Spring Boot's `RabbitTemplate`: a message
+   published while the MDC holds an id gets the `x-request-id` header (a header
+   the message already has is kept). `NotificationPublisher` and the services' own
+   publishers get it this way, with their calls unchanged. `AccountActivityEvent`
+   gained `requestId` (left out of the JSON when null): `ActivityOutbox` fills it
+   from the MDC when the caller did not, so the relay, which sends later on its own
+   thread, still sets the header (`RabbitConfirmedSender`); `ActivityEventPublisher`
+   sets the header from the event's `requestId` when present.
+5. **Listeners.** `RequestIdListenerAdviceRegistrar` (a `BeanPostProcessor`) puts
+   `RequestIdListenerAdvice` in front of the advice chain of every
+   `AbstractRabbitListenerContainerFactory` bean (Boot's
+   `rabbitListenerContainerFactory` and the services' own); the advice already
+   there, such as Boot's retry interceptor, stays behind it, so retries and the
+   recoverer's log lines carry the id as well. While a listener handles a message
+   the MDC holds the message's `x-request-id` (the first message of a batch); a
+   message without one, or with a malformed one, runs with the key removed, so an
+   earlier id never leaks into it. A container built by hand adds the
+   `requestIdListenerAdvice` bean to its own chain.
+6. **Error envelopes.** `ApiResponse` gained `reference` (left out of the JSON
+   when null, so success bodies and bodies written without an id keep exactly
+   their five fields). Every error body the library writes sets it to the current
+   id: `GlobalExceptionHandler` (the `error(...)` / `validationFailed(...)` hooks
+   and the business and 405 answers), `DataAccessExceptionHandler`,
+   `CustomErrorController` (falls back to the request attribute),
+   `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`, the
+   JWT filter's own 401 and `InternalEndpointGuard`'s 404. The reference quoted in
+   a 500 (`Internal server error (reference X)`, also the hide-5xx answer and the
+   409 data conflict) is the request id when there is one, a UUID otherwise. A
+   subclass of `GlobalExceptionHandler` that overrides `error(...)` without
+   calling `super` sets the field itself with `CurrentRequestId.stamp(body)`.
+
+What a service does:
+
+- Nothing to get the filter: `@EnableCommon` includes it (or add
+  `@EnableRequestCorrelation`). The messaging side is on wherever common-messaging
+  is on the classpath with Spring Boot's RabbitMQ auto-configuration.
+- To show the id in the logs, set
+
+  ```properties
+  logging.pattern.level=%5p [${spring.application.name:-},%X{requestId:-}]
+  ```
+
+  Spring Boot's default console (and file) pattern prints the level through this
+  property, so every line then shows the level followed by
+  `[account-service,3f2a9c1e-...]` (nothing after the comma outside a request or
+  message). No logback file is needed.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `itways.request-id.enabled` | `true` | `false`: no `requestIdFilter` (no response header, no MDC key, so no `reference` in error bodies). |
+| `itways.request-id.messaging.enabled` | `true` | `false`: no publish post-processor and no listener advice. The outbox still records an event's `requestId` and sends it as the header. |
+
+What changes for a service that takes this version: every response carries
+`X-Request-Id`, and error bodies carry `reference` whenever the request had an id,
+which with the filter is always (MockMvc tests that register the service's
+filters included). A test asserting that an error body has exactly five fields,
+or no `reference`, needs updating; success bodies are unchanged. Outbox payloads
+of events recorded during a request gain `requestId`; a consumer on an older
+common-lib ignores it (Spring AMQP's JSON converter does not fail on unknown
+properties). The OpenAPI schema of the envelope gains the optional `reference`.
 
 ## Security defaults
 
@@ -390,6 +485,8 @@ status or readiness.
 | `itways.internal-guard.enabled` | `true` | With `@EnableInternalEndpointGuard`: `false` registers no filter. |
 | `itways.internal-guard.proxy-headers` | `X-Forwarded-For,X-Forwarded-Host,Forwarded` | The headers whose presence marks a proxied request (at least one). |
 | `itways.client-ip.trusted-proxies` | `${TRUSTED_PROXIES:127.0.0.0/8,::1/128,172.16.0.0/12}` | The proxies allowed to say who the client is (`ClientIpResolver`); IP literals and CIDR ranges only. |
+| `itways.request-id.enabled` | `true` | With `@EnableCommon` or `@EnableRequestCorrelation`: `false` registers no request-id filter. |
+| `itways.request-id.messaging.enabled` | `true` | `false`: messages get no `x-request-id` header from the logging context and listeners do not read it. |
 | `itways.errors.hide-server-error-messages` | `false` | `true` answers a 5xx `BusinessException` with a fixed text and a reference instead of its message. |
 | `mail.secrets.key`, `mail.secrets.previous-key` | `${MAIL_SECRETS_KEY:}`, `${MAIL_SECRETS_KEY_PREVIOUS:}` | With `@EnableMailSecrets`: the key that seals SEND_MAIL passwords, and the retired one during a rotation. |
 | `itways.mail-secrets.required` | `true` | `false`: a blank key registers no `MailSecrets` bean instead of failing the startup. |
@@ -414,7 +511,7 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
 - common-core: `CommonCoreIsFrameworkFreeTest` (every class of the module against
   the allowed references; `security.core` against the stricter rule);
   `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `PublicUrlPolicyTest`,
-  `TrustedProxiesTest`, `ClientIpTest`.
+  `TrustedProxiesTest`, `ClientIpTest`, `RequestIdsTest`.
 - common-web: `SecurityCoreDelegationTest` (the Spring classes delegate to the
   credential rules); `JwtAuthenticationFilterTest` (who gets a session, who gets
   401, who continues unauthenticated); `AccessTokenRevocationTest` (the filter with
@@ -429,17 +526,24 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   `GlobalExceptionHandlerTest` (every handler called directly, the hooks, the hide
   flag, a subclass replacing the base), `ServiceCallsTest` (against a local
   server), `MailSecretsConfigTest`, `PublicOnlyDnsResolverTest`,
+  the request id (ARC-25): `RequestIdFilterTest`, `CurrentRequestIdTest`,
+  `RequestCorrelationConfigTest` (registration and the servlet path through
+  MockMvc), `ErrorEnvelopeReferenceTest` (every error writer, with and without an
+  id), `ApiResponseJsonTest`,
   `PinnedHttpClientsTest`, `BoundedDownloadsTest`, `DnsRebindingTest` (needs
   `127.0.0.2` on the loopback interface, as on Linux; skipped elsewhere).
 - common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
   `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
   health and gauges, and that it stays off without the property);
   `RabbitPublishingAutoConfigurationTest`, `NotificationPublisherTest`,
-  `DeadLetterQueueGaugeTest`.
+  `DeadLetterQueueGaugeTest`; the request id (ARC-25):
+  `RequestIdPublishPostProcessorTest`, `RequestIdListenerAdviceTest`,
+  `RequestIdListenerAdviceRegistrarTest`, `ActivityEventPublisherTest`.
 
 `mvn verify` also runs common-messaging's `ActivityOutboxIT` (Testcontainers:
 Postgres and RabbitMQ): a rollback writes and sends nothing, a commit sends exactly
 once, a broker outage keeps the rows and sends them after recovery, two relays never
-send one row twice, sent rows go after the retention.
+send one row twice, sent rows go after the retention, and the request id recorded
+with an event arrives as its `x-request-id` header.
 
 A change here is verified against every consumer's own suite before it ships.

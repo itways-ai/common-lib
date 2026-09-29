@@ -25,6 +25,7 @@ import com.itways.common.response.ApiResponse;
 import com.itways.security.SecurityUtils;
 import com.itways.security.SessionRevocationStore;
 import com.itways.security.jwt.JwtTokenProvider;
+import com.itways.web.correlation.CurrentRequestId;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -195,14 +196,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	/**
 	 * Ends the request with 401 in the platform's {@link ApiResponse} envelope,
-	 * the same shape every controller error has, so clients parse one format.
+	 * the same shape every controller error has, so clients parse one format
+	 * (with the request id as {@code reference} when there is one, ARC-25).
 	 */
 	private void reject(HttpServletResponse response, String message, String errorCode) throws IOException {
 		SecurityContextHolder.clearContext();
 		response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-		response.getWriter().write(objectMapper().writeValueAsString(ApiResponse.error(message, errorCode)));
+		response.getWriter()
+				.write(objectMapper().writeValueAsString(CurrentRequestId.stamp(ApiResponse.error(message, errorCode))));
 	}
 
 	/**

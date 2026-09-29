@@ -18,7 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -28,6 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itways.activity.dto.AccountActivityEvent;
 import com.itways.activity.dto.ActivityCategory;
 import com.itways.activity.dto.ActivitySeverity;
+import com.itways.common.correlation.RequestIds;
 
 class ActivityOutboxTest {
 
@@ -42,6 +45,11 @@ class ActivityOutboxTest {
     {
         doAnswer(invocation -> insertedInTransaction.add(TransactionSynchronizationManager.isActualTransactionActive()))
                 .when(store).insert(any(), anyString());
+    }
+
+    @AfterEach
+    void cleanThread() {
+        MDC.clear();
     }
 
     @Test
@@ -147,6 +155,49 @@ class ActivityOutboxTest {
 
         assertThat(payload[0]).contains("\"occurredAt\":\"2026-09-27T10:15:30.123456Z\"");
         assertThat(json.readValue(payload[0], AccountActivityEvent.class)).isEqualTo(event);
+    }
+
+    // ── Request id (ARC-25) ────────────────────────────────────────────────────
+
+    @Test
+    void anEventRecordedDuringARequestCarriesItsId() throws Exception {
+        MDC.put(RequestIds.MDC_KEY, "req-outbox-1");
+        AccountActivityEvent event = event();
+        String[] payload = new String[1];
+        doAnswer(invocation -> payload[0] = invocation.getArgument(1)).when(store).insert(any(), anyString());
+
+        outbox.record(event);
+
+        assertThat(event.getRequestId()).isEqualTo("req-outbox-1");
+        assertThat(payload[0]).contains("\"requestId\":\"req-outbox-1\"");
+        assertThat(json.readValue(payload[0], AccountActivityEvent.class).getRequestId()).isEqualTo("req-outbox-1");
+    }
+
+    @Test
+    void anEventRecordedIndependentlyCarriesItToo() {
+        MDC.put(RequestIds.MDC_KEY, "req-outbox-2");
+        AccountActivityEvent event = event();
+
+        outbox.recordIndependently(event);
+
+        assertThat(event.getRequestId()).isEqualTo("req-outbox-2");
+    }
+
+    @Test
+    void theCallersOwnIdWinsAndWithoutAnyThePayloadHasNoRequestIdField() {
+        MDC.put(RequestIds.MDC_KEY, "req-outbox-3");
+        AccountActivityEvent own = event();
+        own.setRequestId("the-callers");
+        outbox.record(own);
+        assertThat(own.getRequestId()).isEqualTo("the-callers");
+
+        MDC.clear();
+        AccountActivityEvent none = event();
+        String[] payload = new String[1];
+        doAnswer(invocation -> payload[0] = invocation.getArgument(1)).when(store).insert(any(), anyString());
+        outbox.record(none);
+        assertThat(none.getRequestId()).isNull();
+        assertThat(payload[0]).doesNotContain("requestId");
     }
 
     private TransactionTemplate caller() {
