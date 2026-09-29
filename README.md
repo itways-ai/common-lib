@@ -406,9 +406,11 @@ needs the platform's public key. Without it the service does not start:
 
 Keys are Base64 X.509 (public) or PKCS#8 (private); PEM armour is accepted for public
 keys. Before this rule a service without a key generated a throwaway pair, started
-and refused every real token (CH-15). The compose file passes the public keys to every
-service through `x-common-env`. notification-service has no `JwtTokenProvider` and needs
-none of them.
+and refused every real token (CH-15). Compose passes the public keys to the gateway and
+every service that checks credentials (`x-credential-check-env` in the workspace's
+`docker-compose.yml`), and the private key to auth-service (and to account-service,
+which still reads provider keys stored under it). notification-service has no
+`JwtTokenProvider` and gets none of them.
 
 ### 401 and 403 answers
 
