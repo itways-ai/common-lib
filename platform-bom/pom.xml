@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.itways</groupId>
+    <artifactId>platform-bom</artifactId>
+    <version>2.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>platform-bom</name>
+    <description>Bill of materials: the one place that says which version of every in-house library the platform's services use</description>
+
+    <!--
+        The platform BOM.
+
+        Every in-house library the services depend on is listed here once, with its
+        version. A service imports this BOM (platform-parent does it for every child)
+        and declares the libraries it needs without a version, so all services move
+        together and no two of them can disagree on a library version.
+
+        Version policy: a library's version is bumped and the library repository is
+        git-tagged on every release; the new version is then written here, and the BOM
+        itself is released (bumped and tagged) with it. Third-party versions are not
+        managed here: they come from Spring Boot, Spring Cloud and the other BOMs that
+        platform-parent imports.
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- common-lib (this repository): the three modules of the shared library. -->
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-messaging</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- The other in-house libraries, each released from its own repository. -->
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>ai-engine-sdk</artifactId>
+                <version>1.2.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>file-storage-sdk</artifactId>
+                <version>2.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>journey-model</artifactId>
+                <version>1.0.18</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>journey-engine-sdk</artifactId>
+                <version>1.0.18</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>
