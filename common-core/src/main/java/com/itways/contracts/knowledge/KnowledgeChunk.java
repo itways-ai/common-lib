@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by journey-service ({@code /api/knowledge-base}), called by
- * speech-service. One definition, so the two cannot drift.
+ * conversation-service. One definition, so the two cannot drift.
  *
  * @param chunkText the text that was embedded — the question
  * @param locale    ISO 639-1; null leaves the row untagged

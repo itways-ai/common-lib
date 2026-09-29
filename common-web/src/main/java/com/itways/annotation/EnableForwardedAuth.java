@@ -12,7 +12,7 @@ import com.itways.feign.ForwardedAuthFeignConfig;
 
 /**
  * Forwards the caller's {@code Authorization} / {@code X-API-KEY} on every
- * Feign call this service makes. For services that call other Nibras services
+ * Feign call this service makes. For services that call other platform services
  * on behalf of the user; see {@link ForwardedAuthFeignConfig}.
  */
 @Target(ElementType.TYPE)

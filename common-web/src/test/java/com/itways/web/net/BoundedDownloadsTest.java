@@ -29,7 +29,7 @@ class BoundedDownloadsTest {
     private String base;
     private final RestTemplate rest = providerRestTemplate();
 
-    /** What speech-service's ProviderHttpConfig builds: the JDK client with short timeouts. */
+    /** What conversation-service's ProviderHttpConfig builds: the JDK client with short timeouts. */
     private static RestTemplate providerRestTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));

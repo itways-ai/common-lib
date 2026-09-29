@@ -11,7 +11,7 @@ import org.springframework.web.client.RestTemplate;
 
 /**
  * A GET whose body is read as a stream and refused once it passes a size cap
- * (F02; ARC-11: moved from speech-service). A voice note or media file is held
+ * (F02; ARC-11: moved from conversation-service). A voice note or media file is held
  * in memory for transcription, so an unbounded {@code byte[]} download lets one
  * oversized (or endless) response take the heap of the whole service.
  */

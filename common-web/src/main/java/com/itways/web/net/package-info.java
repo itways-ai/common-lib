@@ -1,6 +1,6 @@
 /**
  * Calls to addresses a tenant or a provider supplies (ARC-11, from
- * speech-service): DNS pinned to vetted public addresses
+ * conversation-service): DNS pinned to vetted public addresses
  * ({@link com.itways.web.net.PublicOnlyDnsResolver},
  * {@link com.itways.web.net.PinnedHttpClients}; SPC-03) and downloads read as
  * a bounded stream ({@link com.itways.web.net.BoundedDownloads}; F02). Needs

@@ -13,7 +13,7 @@ import com.itways.security.core.TokenVerifier;
  * What kind of credential the current session was built from, read from the
  * details map the platform's authentication filters set (ARC-11; the one
  * version of the {@code USER_SESSION} rule account, channels, journey, template
- * and speech-service each carried).
+ * and conversation-service each carried).
  *
  * <p>
  * {@code JwtAuthenticationFilter} puts {@value #DETAIL_ACCOUNT_ID},
@@ -36,7 +36,7 @@ import com.itways.security.core.TokenVerifier;
  * details map <em>without</em> a token type still counts as a user, because the
  * other five services and many of their test fixtures build one that way, and
  * the filter itself never omits it. A blank principal name is refused, as
- * speech-service did.
+ * conversation-service did.
  */
 public final class Sessions {
 

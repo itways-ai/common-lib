@@ -9,7 +9,7 @@ import java.util.UUID;
  *
  * <p>
  * channels-service is the only writer of {@code channel_identities}:
- * speech-service asks it to look a caller up, to record that a verified caller
+ * conversation-service asks it to look a caller up, to record that a verified caller
  * used their link, and to link a number verified from the web widget, instead
  * of mapping and writing the table itself.
  */

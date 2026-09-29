@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by journey-service ({@code /api/journeys/internal/knowledge/embeddings/stale}),
- * called by speech-service, which owns the model. One definition, so the two
+ * called by conversation-service, which owns the model. One definition, so the two
  * cannot drift.
  *
  * @param remaining how many passages of the account are stale, this batch included

@@ -7,8 +7,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by account-service ({@code GET /api/account/ai-configs/internal/active})
- * to speech-service only, for the account named in the caller's own credential.
- * Never log it, put it in a shared cache such as Redis (speech-service keeps it
+ * to conversation-service only, for the account named in the caller's own credential.
+ * Never log it, put it in a shared cache such as Redis (conversation-service keeps it
  * in process memory for a few minutes only), or return it to a browser.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

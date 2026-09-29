@@ -2,7 +2,7 @@ package com.itways.contracts.channels;
 
 /**
  * The kinds of channel. Stored by name in {@code channels.type}; channels-service
- * writes it and speech-service and journey-service read it.
+ * writes it and conversation-service and journey-service read it.
  */
 public enum ChannelType {
 	WHATSAPP_TWILIO,

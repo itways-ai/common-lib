@@ -15,7 +15,7 @@ import com.itways.encryption.MailSecretsConfig;
  * SEND_MAIL SMTP passwords), required unless
  * {@code itways.mail-secrets.required=false}; see {@link MailSecretsConfig}.
  * For the services that seal or open those passwords (journey, notification,
- * speech).
+ * conversation).
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)

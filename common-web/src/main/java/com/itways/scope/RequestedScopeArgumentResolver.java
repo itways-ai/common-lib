@@ -8,7 +8,11 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/** Resolves {@link RequestedScope} parameters; see there for the precedence. */
+/**
+ * Resolves {@link RequestedScope} parameters; see there for the precedence. The
+ * header is {@link ScopeHeaders#ASSISTANT}, else the legacy
+ * {@link ScopeHeaders#LEGACY_ASSISTANT} (2.1.0 transition).
+ */
 public class RequestedScopeArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
@@ -20,8 +24,7 @@ public class RequestedScopeArgumentResolver implements HandlerMethodArgumentReso
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
             NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-        return resolve(webRequest.getParameter(ScopeHeaders.SCOPE_PARAM),
-                webRequest.getHeader(ScopeHeaders.ASSISTANT));
+        return resolve(webRequest.getParameter(ScopeHeaders.SCOPE_PARAM), AssistantHeader.read(webRequest::getHeader));
     }
 
     /** The list a request asked for; malformed values are a 400, never "everything". */

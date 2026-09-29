@@ -7,7 +7,7 @@ import java.util.Set;
  * accepts.
  *
  * <p>
- * channels-service validates and stores them; speech-service reads them back
+ * channels-service validates and stores them; conversation-service reads them back
  * from the same row to run the channel. A key renamed on one side only used to
  * read as "not set" on the other — no error, just a channel quietly falling back
  * to defaults — which is why neither service declares them itself.

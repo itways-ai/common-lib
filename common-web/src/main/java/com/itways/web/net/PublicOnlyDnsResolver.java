@@ -40,7 +40,7 @@ import lombok.extern.slf4j.Slf4j;
  * {@code .domain} suffix that matches the domain and everything under it.
  * An allow-listed host is dialled at whatever it resolves to. What counts as
  * public is a {@link Predicate} too, {@link PublicUrlPolicy#isPublic} by
- * default (ARC-11; moved from speech-service, where it had no allow-list).
+ * default (ARC-11; moved from conversation-service, where it had no allow-list).
  */
 @Slf4j
 public final class PublicOnlyDnsResolver implements DnsResolver {

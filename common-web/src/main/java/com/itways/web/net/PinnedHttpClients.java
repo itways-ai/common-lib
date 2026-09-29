@@ -16,7 +16,7 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 /**
  * HTTP clients for calls to tenant-supplied URLs, whose connections go only to
  * addresses a {@link PublicOnlyDnsResolver} vetted (SPC-03; ARC-11: moved from
- * speech-service, with journey-engine's stricter settings).
+ * conversation-service, with journey-engine's stricter settings).
  *
  * <p>
  * Apache HttpClient 5 because it lets the connection manager take its DNS from

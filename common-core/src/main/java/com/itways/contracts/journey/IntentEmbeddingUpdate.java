@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * A freshly computed intent vector for one journey version.
  *
  * <p>
- * assistant-service computes it (it owns the embedding model) and posts it to
+ * conversation-service computes it (it owns the embedding model) and posts it to
  * journey-service ({@code POST /api/journeys/internal/intent-catalog/embeddings}), which
  * stores it. Shared so both sides agree on the shape.
  * @param embeddingModel which model made the vector (e.g. granite-embedding:278m); null when the

@@ -182,7 +182,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	 * The shared 401 answer ({@link ApiResponseAuthenticationEntryPoint},
 	 * {@code AUTH_401} in the envelope) with the session-ended message. Called
 	 * directly rather than left to the chain, so every service answers 401 even
-	 * where its chain names no entry point (speech-service would answer an
+	 * where its chain names no entry point (conversation-service would answer an
 	 * empty 403, which the portal does not treat as an ended session).
 	 */
 	private ApiResponseAuthenticationEntryPoint sessionEndedEntryPoint() {

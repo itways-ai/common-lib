@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import java.util.Map;
 
 /**
- * Shared by template-service, which renders, and speech-service, whose
+ * Shared by template-service, which renders, and conversation-service, whose
  * TEMPLATE_RENDER step asks it to ({@code POST /api/templates/{id}/render}).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

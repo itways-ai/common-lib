@@ -13,7 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * The caller's own credential on the request being served, for an outbound
  * call to another platform service to carry on: the {@code Authorization}
  * header (or what a {@link ForwardedAuthorizationResolver} finds when there is
- * none: speech-service's channel webhook tokens) and the {@code X-API-KEY}
+ * none: conversation-service's channel webhook tokens) and the {@code X-API-KEY}
  * header, each only when present. The one resolution
  * {@link ServiceCalls}, {@link ForwardedCallerInterceptor} and the Feign
  * interceptor of {@code @EnableForwardedAuth} share (ARC-11).

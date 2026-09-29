@@ -22,7 +22,7 @@ import javax.crypto.spec.SecretKeySpec;
  * The key ({@code MAIL_SECRETS_KEY}, 32 random bytes, Base64) is held by
  * journey-service, which seals the password when a step is saved,
  * notification-service, which opens it right before it connects to the tenant's
- * mail server, and speech-service, which seals a password still in plain text
+ * mail server, and conversation-service, which seals a password still in plain text
  * (a version published before this class existed) before publishing it. The
  * journey engine passes the sealed value through and never needs the key.
  *

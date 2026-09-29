@@ -20,7 +20,7 @@ import feign.RequestInterceptor;
 import feign.RequestTemplate;
 
 /**
- * The service token on every Feign call (speech-service's calls to account, journey,
+ * The service token on every Feign call (conversation-service's calls to account, journey,
  * channels and template-service), with and without a request being served (PLT-12).
  */
 @ExtendWith(OutputCaptureExtension.class)

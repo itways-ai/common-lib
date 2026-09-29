@@ -17,8 +17,8 @@ import com.itways.security.servlet.Sessions.CredentialKind;
 
 /**
  * The reconciled USER_SESSION rule (ARC-11), every branch: the deny-list of
- * account/channels/journey/template/speech, auth-service's allow-list on the
- * token type, and speech-service's name check.
+ * account/channels/journey/template/conversation, auth-service's allow-list on the
+ * token type, and conversation-service's name check.
  */
 class SessionsTest {
 
@@ -89,7 +89,7 @@ class SessionsTest {
 
     @Test
     void aBlankNameIsRefused() {
-        // speech-service's check: a session that names nobody is not a user.
+        // conversation-service's check: a session that names nobody is not a user.
         for (String name : new String[] { "", "   " }) {
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(name, null,
                     Collections.emptyList());

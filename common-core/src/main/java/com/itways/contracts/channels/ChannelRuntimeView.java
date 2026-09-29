@@ -13,7 +13,7 @@ import lombok.Setter;
 /**
  * A channel as the runtime sees it, served by channels-service at
  * {@code GET /api/channels/internal/{id}} to the services that answer on it
- * (speech-service) or check what is reachable (journey-service).
+ * (conversation-service) or check what is reachable (journey-service).
  *
  * <p>
  * channels-service owns the {@code channels} table; nobody else maps or

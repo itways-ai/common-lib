@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
  * environment variable) and {@code mail.secrets.previous-key} (default
  * {@code MAIL_SECRETS_KEY_PREVIOUS}, set only during a rotation). ARC-11; the
  * one version of journey-service's and notification-service's
- * {@code MailSecretsConfig} and speech-service's inline construction.
+ * {@code MailSecretsConfig} and conversation-service's inline construction.
  *
  * <p>
  * By default the key is required: with a blank key the service does not start

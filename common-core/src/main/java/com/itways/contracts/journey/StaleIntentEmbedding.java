@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * journey-service lists them ({@code GET /api/journeys/intent-catalog/stale});
- * assistant-service embeds the text and sends back an
+ * conversation-service embeds the text and sends back an
  * {@link IntentEmbeddingUpdate}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

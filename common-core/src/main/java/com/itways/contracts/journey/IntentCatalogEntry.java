@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by journey-service ({@code GET /api/journeys/intent-catalog}) and read
- * by assistant-service. One definition, so a field added on one side cannot be
+ * by conversation-service. One definition, so a field added on one side cannot be
  * silently missing on the other; unknown fields are ignored so the two services
  * can still be deployed one at a time.
  */

@@ -17,7 +17,7 @@ import org.springframework.core.env.Environment;
  * with a username and password. The line put a working credential in the logs
  * (unused, since form login and HTTP Basic are off, but still a credential) and
  * the in-memory user was one more thing to reason about. account, auth, channels,
- * notification and template excluded it one by one; journey and speech did not.
+ * notification and template excluded it one by one; journey and conversation did not.
  *
  * <p>
  * Registered in {@code META-INF/spring.factories}, so it applies to

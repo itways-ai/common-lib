@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by journey-service ({@code GET /api/journeys/routing-summary}): the
- * console compares it to warn about confusable journeys, and speech-service
+ * console compares it to warn about confusable journeys, and conversation-service
  * turns it into the voice channel's speech hints.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

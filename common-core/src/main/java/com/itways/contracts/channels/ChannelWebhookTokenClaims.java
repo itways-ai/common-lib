@@ -5,7 +5,7 @@ package com.itways.contracts.channels;
  *
  * <p>
  * channels-service mints the token when a Telegram, WhatsApp or voice channel
- * is registered; speech-service verifies it on every inbound webhook. The two
+ * is registered; conversation-service verifies it on every inbound webhook. The two
  * must agree on every claim name, which is why this lives in neither service.
  */
 public final class ChannelWebhookTokenClaims {

@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * <p>
  * Served by journey-service ({@code /api/knowledge-base}), called by
- * speech-service. One definition, so the two cannot drift.
+ * conversation-service. One definition, so the two cannot drift.
  *
  * @param limit  at most this many hits; 0 or less means the default
  * @param locale the conversation language; null searches every locale

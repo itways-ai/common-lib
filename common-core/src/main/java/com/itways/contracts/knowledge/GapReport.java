@@ -5,11 +5,11 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * A question the assistant could not answer well, as speech-service reports it.
+ * A question the assistant could not answer well, as conversation-service reports it.
  *
  * <p>
  * Served by journey-service ({@code /api/knowledge-base}), called by
- * speech-service. One definition, so the two cannot drift.
+ * conversation-service. One definition, so the two cannot drift.
  *
  * @param bestScore   similarity of the closest passage found, if any
  * @param bestPassage that passage, for the reviewer's context

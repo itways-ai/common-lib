@@ -23,7 +23,7 @@ import com.itways.security.SecurityUtils;
  * They used to be encrypted with {@code JWT_ENCRYPTION_KEY}, which every
  * service holds. This key ({@code CHANNEL_SECRETS_KEY}, 32 random bytes,
  * Base64) is given only to channels-service, which stores the secrets, and
- * speech-service, which uses them to send messages.
+ * conversation-service, which uses them to send messages.
  *
  * <p>
  * Format: {@code cs:<kid>:} + Base64(12-byte nonce + AES-256-GCM ciphertext and
