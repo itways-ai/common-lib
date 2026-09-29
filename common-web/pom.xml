@@ -133,6 +133,12 @@
             <artifactId>spring-jdbc</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Optional: the pinned-DNS HTTP clients (web.net) for calls to tenant-supplied URLs; version from Spring Boot's BOM. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- Test -->
         <dependency>

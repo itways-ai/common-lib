@@ -34,6 +34,14 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  * With no token configured and enforcement off, this admits everything, which is
  * the behaviour before this class existed.
+ *
+ * <p>
+ * {@link #admits} is that rollout rule. {@link #matches} is the strict check
+ * (a configured token, presented and equal, whatever the enforce flag) for
+ * places that decide something other than "serve this internal route":
+ * account-service's deletion route and template-service's render lane.
+ * {@link #headerValue} is what an outbound call sends
+ * ({@code com.itways.web.client.ServiceCalls}); it is never logged.
  */
 @Slf4j
 @Component("internalServiceToken")
@@ -74,5 +82,32 @@ public class InternalServiceToken {
         log.warn("Internal call with {} service token (allowed; refused once itways.internal-token-enforce=true): {} {}",
                 problem, request.getMethod(), request.getRequestURI());
         return true;
+    }
+
+    /** Whether a (non-blank) {@code itways.internal-token} is set. */
+    public boolean isConfigured() {
+        return token.length > 0;
+    }
+
+    /**
+     * Whether {@code presented} is the configured token: a constant-time
+     * comparison of the trimmed value, {@code false} for a null or blank value
+     * and always {@code false} while no token is configured. Ignores the
+     * enforce flag and logs nothing; the strict check, as opposed to
+     * {@link #admits}.
+     */
+    public boolean matches(String presented) {
+        if (token.length == 0 || presented == null || presented.isBlank()) {
+            return false;
+        }
+        return MessageDigest.isEqual(token, presented.trim().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * The value an outbound call sends as {@value #HEADER}: the configured token,
+     * trimmed, or {@code null} when none is set. Never log it.
+     */
+    public String headerValue() {
+        return token.length == 0 ? null : new String(token, StandardCharsets.UTF_8);
     }
 }

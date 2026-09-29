@@ -77,7 +77,9 @@ bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 | Annotation | Module | Imports | What the service gets |
 | --- | --- | --- | --- |
 | `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC). `ApiResponse` / `PageResponse` are plain classes in common-core. |
-| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers |
+| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on) |
+| `@EnableInternalEndpointGuard` | common-web | `security.internal.InternalEndpointGuardConfig` | The `/internal/` guard filter (`internalEndpointGuard`, see "Shared helpers"); needs `@EnableCustomSecurity` |
+| `@EnableMailSecrets` | common-web | `encryption.MailSecretsConfig` | The `MailSecrets` bean from `MAIL_SECRETS_KEY`, required unless `itways.mail-secrets.required=false` |
 | `@EnableCache` | common-web | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
 | `@EnableAssistantScope` | common-web | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`; spring-jdbc is optional here) |
 | `@EnableEncryption` | common-web | `encryption.EncryptionConfig` | `RsaService` (the `EncryptionService`); `ChannelSecrets` and `MailSecrets` are static helpers of that package |
@@ -117,20 +119,123 @@ is now Spring Boot's.
 | `security.core` | core | Framework-free credential rules: `TokenVerifier` (JWT, platform and channel-webhook keys, rotation), `ApiKeyCodec` (`X-API-KEY` format), `CredentialCrypto` (AES-256-GCM, SHA-256), `PublicKeys`, `SecurityMessages`. |
 | `contracts` | core | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). Their `@Schema` descriptions feed the portal's OpenAPI specs; the annotation library is optional. |
 | `common.response`, `common.constants`, `common.exception` | core | Envelope (`ApiResponse`, `PageResponse`), error codes, `BusinessException`, `InvalidApiKeyException`. |
-| `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). |
+| `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). `IpLiterals`, `TrustedProxies` and `ClientIp`: the client-IP rule behind our proxies (the gateway's, shared). |
 | `common.util` | core | `UtcDateTimes`. |
-| `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`. |
-| `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). |
+| `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`; `Sessions` (the USER_SESSION rule and the details keys) and `ClientIpResolver` (the servlet side of `ClientIp`). |
+| `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). `InternalEndpointGuard` / `InternalEndpointGuardConfig`: the filter that keeps those routes off the public edge (`@EnableInternalEndpointGuard`). |
+| `web.client` | web | `ServiceCalls`, `ForwardedCallerInterceptor`, `CallerCredentials`: `RestClient`s to other platform services that carry the service token and the caller's credential. |
+| `web.net` | web | `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads`: calls to tenant-supplied URLs pinned to vetted public addresses, and size-capped downloads (needs Apache HttpClient 5, optional here). |
 | `security.config`, `security.resolver`, `security.annotation` | web | Security wiring, `@AccountId`. |
 | `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`. |
 | `cache` | web | `CacheStore` / `CacheStoreFactory` with Ehcache, Redis and hybrid stores; `CacheProperties`. |
 | `encryption` | web | `ChannelSecrets` (`CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords), `EncryptionService`, `RsaService`. |
-| `common.config`, `common.handler` | web | `CommonConfig`, `SwaggerConfig`, `TimeConfig`, the OpenAPI customizers; the exception handlers and `/error` controller. |
+| `common.config`, `common.handler` | web | `CommonConfig`, `SwaggerConfig`, `TimeConfig`, the OpenAPI customizers; the exception handlers (`GlobalExceptionHandler` is an overridable base, see "Shared helpers") and `/error` controller. |
 | `feign`, `freemarker`, `jpa` | web | The opt-in integrations above. |
 | `annotation` | web + messaging | The `@Enable*` annotations; `EnableActivity` and `EnableNotifications` ship in common-messaging, the rest in common-web. |
-| `amqp`, `messaging` | messaging | RabbitMQ JSON conversion; publisher confirms and returns. |
+| `amqp`, `messaging` | messaging | RabbitMQ JSON conversion; publisher confirms and returns; `DeadLetterQueueGauge` (a queue's depth as a Micrometer gauge). |
 | `notification`, `activity` | messaging | Notification and activity publishers and their DTOs. |
 | `activity.outbox` | messaging | The transactional outbox for activity events: `ActivityOutbox`, `ActivityOutboxRelay`, `ActivityOutboxStore`, `RabbitConfirmedSender`, the health indicator and gauges. |
+
+## Shared helpers (ARC-11)
+
+Eight helpers the services had copied from one another now have one version
+here. Everything is additive: nothing changes for a service until it adopts a
+helper, and a service that adopts one deletes its copy. The rule of each is the
+strictest correct one among the copies; where copies legitimately differed there
+is a knob.
+
+| Helper | Module, package | How to enable | Replaces |
+| --- | --- | --- | --- |
+| `InternalEndpointGuard` | common-web, `security.internal` | `@EnableInternalEndpointGuard` on the application class (needs `@EnableCustomSecurity`) | account `web/InternalEndpointGuard`, channels / journey / template `config/InternalEndpointGuard` |
+| `Sessions` | common-web, `security.servlet` | Use it: `anyRequest().access(Sessions.userSession())`, `Sessions.isUserSession(auth)`, `Sessions.kindOf(auth)` | account / channels `SecurityConfig.USER_SESSION`, journey `support/Sessions`, template `SecurityConfig.isUserSession`, speech `chat/ChatOwner.isUserSession`, account `ActivityRecorder.currentCredentialKind` |
+| `ClientIp` + `ClientIpResolver` | common-core `common.net` (`IpLiterals`, `TrustedProxies`, `ClientIp`); common-web `security.servlet.ClientIpResolver` | The bean `clientIpResolver` comes with `@EnableCustomSecurity`; `resolve(request)` or `current()` | gateway `net/IpLiterals`, `net/TrustedProxies` (the gateway keeps `ClientAddressFilter` on top of `ClientIp`), account `activity/ClientIpResolver`, auth `audit/ClientRequestInfo` (its IP part) |
+| `GlobalExceptionHandler` (overridable) | common-web, `common.handler` | Already there with `@EnableCommon`; a service with its own codes registers `class XExceptionHandler extends GlobalExceptionHandler` (a scanned `@RestControllerAdvice`) and overrides handlers or hooks; the base backs off | account `web/AccountExceptionHandler`, auth `config/AuthExceptionHandler` (the framework part; their domain handlers stay in the subclass) |
+| `ServiceCalls` | common-web, `web.client` | The bean `serviceCalls` comes with `@EnableCustomSecurity`: `serviceCalls.client(baseUrl)` / `.builder()`; or `.headers(serviceCalls::forwardCaller)` on a client built elsewhere | channels / journey `integrations/ServiceHttp`, account `assistants/ForwardedCaller`, template `integrations/JourneyUsageClient.callerAndServiceHeaders`; the Feign interceptor of `@EnableForwardedAuth` shares its resolution (`CallerCredentials`) |
+| `MailSecretsConfig` | common-web, `encryption` | `@EnableMailSecrets`; consumers inject `MailSecrets` (or `ObjectProvider<MailSecrets>` when optional) | journey / notification `config/MailSecretsConfig`, speech `notification/RabbitMailDeliveryAdapter`'s inline `new MailSecrets(...)` |
+| `DeadLetterQueueGauge` | common-messaging, `messaging` | Declare a bean: `new DeadLetterQueueGauge(amqpAdmin, "notification.dlq.messages", "notification.dlq", "...")` (Actuator on the classpath; no `@EnableScheduling` needed) | account `activity/DeadLetterQueueGauge`, notification `messaging/DeadLetterQueueGauge` |
+| `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads` | common-web, `web.net` | Use them; add `org.apache.httpcomponents.client5:httpclient5` to the service (optional here) | speech `net/PinnedHttpClients`, `net/PublicOnlyDnsResolver`, `net/BoundedDownloads` |
+
+The rules, and what changes for an adopter:
+
+- **Internal guard.** An `/internal` path segment (regex `.*/internal(/.*|;.*)?`
+  on the lower-cased raw URI and on the decoded servlet path, so `/%69nternal/`
+  counts) that arrived through a proxy (any of `X-Forwarded-For`,
+  `X-Forwarded-Host`, `Forwarded` present, whatever the value) is refused; a
+  direct call is refused when `InternalServiceToken.admits` says so (log-only
+  until `itways.internal-token-enforce=true`). The refusal is 404 with the
+  real-404 body, `The requested resource was not found` / `NOT_FOUND`, the same
+  one `GlobalExceptionHandler`, `CustomErrorController` and the gateway send, so
+  a probe cannot tell the route exists. Channels, journey and template answered
+  `Not found` with `NOT_FOUND` or `RES_001`: their proxied-probe body changes
+  when they adopt. Filter name `internalEndpointGuard`, `/*`, order
+  `HIGHEST_PRECEDENCE + 10` (the first slots stay free for the request-id
+  filter of ARC-25). A committed response is left alone. `InternalServiceToken`
+  also gained `isConfigured()`, `matches(presented)` (strict, constant-time,
+  ignores the enforce flag; for account's deletion route and template's render
+  lane) and `headerValue()` (what an outbound call sends). Static
+  `isInternalPath(request)` and `cameThroughProxy(request)` are public.
+- **User session.** A session is a user's when it is authenticated, names a
+  principal (speech's check), has a details map, is not an API key
+  (`authSource=API_KEY`), is not a channel webhook token
+  (`tokenType=CHANNEL_WEBHOOK`) and, if it names a token type at all, that type
+  is `ACCESS` (auth's allow-list: a refresh token or an unknown type is refused).
+  A details map without a token type still counts as a user, because five
+  services and many test fixtures build one that way and the JWT filter never
+  omits it. The details keys are constants (`Sessions.DETAIL_*`); the filters
+  write the same strings as before.
+- **Client IP.** The gateway's rule: every `X-Forwarded-For` line, comma-split,
+  each hop normalised (trim, quotes, brackets, `:port`), a hop that is not an IP
+  literal skipped and never resolved; the header consulted only when the peer is
+  a trusted proxy; the right-most untrusted literal, else (all hops ours) the
+  left-most, else the peer; cut to 64 characters. Account and auth read only the
+  first header line and returned a garbage hop as the client: account's test
+  `garbageInTheHeaderIsNotTreatedAsAProxy` now expects the peer instead of
+  `evil.example.com`. Trusted proxies: `itways.client-ip.trusted-proxies`
+  (default `${TRUSTED_PROXIES:127.0.0.0/8,::1/128,172.16.0.0/12}`); a name fails
+  the startup, as in the gateway. Account and auth keep reading their own keys
+  until they adopt.
+- **Exception handler.** Defaults are unchanged. Hooks: `error(status, message,
+  code)`, `validationFailed(map)`, `newReference()` (a UUID),
+  `clientErrorCode(status)` (`HTTP_<n>`; auth overrides to `HttpStatus.name()`),
+  `hideServerErrorMessages()` (`itways.errors.hide-server-error-messages`,
+  default `false`: when `true` a 5xx `BusinessException` answers its own status
+  with `Internal server error (reference X)` / `INTERNAL_SERVER_ERROR` and the
+  real message is logged with the reference; account and auth override it to
+  `true`). The base is `@ConditionalOnMissingBean(GlobalExceptionHandler.class)`:
+  a subclass that is a scanned component, or a configuration class registered
+  before `@EnableCommon` is processed, replaces it; a `@Bean` method on the
+  application class itself is registered too late and would run beside it.
+- **Service calls.** Not a global `RestClientCustomizer`: the service token and
+  the caller's credential must never reach Telegram, Twilio or an AI provider,
+  so `ServiceCalls.builder()` clones Boot's builder (or starts a fresh one), adds
+  `X-Service-Token` = `InternalServiceToken.headerValue()` when configured
+  (trimmed; nothing when blank) and the `ForwardedCallerInterceptor`, which
+  copies `Authorization` (or the `ForwardedAuthorizationResolver`'s answer) and
+  `X-API-KEY` from the request being served, each only when present, nothing
+  outside a request, never logged. `client(baseUrl)` uses the JDK factory with
+  2 s connect / 5 s read. Channels' calls did not forward `X-API-KEY`; they do
+  once they adopt.
+- **Mail secrets.** `mail.secrets.key` (default `${MAIL_SECRETS_KEY:}`) and
+  `mail.secrets.previous-key` (default `${MAIL_SECRETS_KEY_PREVIOUS:}`); a
+  blank key fails the startup with `MailSecrets`' own message. With
+  `itways.mail-secrets.required=false` a blank key registers no bean (speech's
+  optional use; a WARN says so). A service's own `MailSecrets` bean wins.
+- **DLQ gauge.** `(AmqpAdmin, metricName, queueName, description)` plus an
+  overload with `initialDelay` / `refreshInterval` (10 s / 30 s); its own daemon
+  thread, started when the registry binds it, stopped on destroy; -1 while
+  unknown; tag `queue=<queueName>` (new for the account and notification metrics:
+  the series gains a label, the names stay); a failure logs the exception's
+  class name only, at DEBUG.
+- **Pinned HTTP.** `PublicOnlyDnsResolver` keeps speech's signatures and refusal
+  (`RefusedAddressException`, an `UnknownHostException`, message without the
+  address) and gains an allow-list (exact names or `.domain` suffixes, as
+  journey-engine's and notification's guards have) and a `Predicate<InetAddress>`
+  for what counts as public (`PublicUrlPolicy::isPublic` by default).
+  `PinnedHttpClients` keeps speech's signatures, defaults (pool 25/5, the
+  `followRedirects` parameter) and adds journey-engine's stricter settings:
+  cookies are never kept and waiting for a pooled connection is bounded by the
+  connect timeout; an overload takes a `PoolSize`. `BoundedDownloads` is as it
+  was.
 
 ## Security defaults
 
@@ -282,6 +387,12 @@ status or readiness.
 | `security.session-revocation.ttl` | `2d` | How long an account cut-off (`nibras:auth:pwchanged:*`) is kept; also the fallback TTL of a revoked session. Must exceed the access-token lifetime. |
 | `jwt.encryption.key` (`JWT_ENCRYPTION_KEY`) | none, required | AES key for tenant binding and API keys (`SecurityUtils`). |
 | `itways.internal-token`, `itways.internal-token-enforce` | none, `false` | `X-Service-Token` for internal routes. |
+| `itways.internal-guard.enabled` | `true` | With `@EnableInternalEndpointGuard`: `false` registers no filter. |
+| `itways.internal-guard.proxy-headers` | `X-Forwarded-For,X-Forwarded-Host,Forwarded` | The headers whose presence marks a proxied request (at least one). |
+| `itways.client-ip.trusted-proxies` | `${TRUSTED_PROXIES:127.0.0.0/8,::1/128,172.16.0.0/12}` | The proxies allowed to say who the client is (`ClientIpResolver`); IP literals and CIDR ranges only. |
+| `itways.errors.hide-server-error-messages` | `false` | `true` answers a 5xx `BusinessException` with a fixed text and a reference instead of its message. |
+| `mail.secrets.key`, `mail.secrets.previous-key` | `${MAIL_SECRETS_KEY:}`, `${MAIL_SECRETS_KEY_PREVIOUS:}` | With `@EnableMailSecrets`: the key that seals SEND_MAIL passwords, and the retired one during a rotation. |
+| `itways.mail-secrets.required` | `true` | `false`: a blank key registers no `MailSecrets` bean instead of failing the startup. |
 | `itways.activity.outbox.enabled` | `false` | Records activity events in the outbox table (needs a `DataSource`, a transaction manager and Boot's RabbitMQ auto-configuration). |
 | `itways.activity.outbox.table` | none, required when enabled | The service's outbox table; lower-case identifier. |
 | `itways.activity.outbox.relay-enabled` | `true` | Whether this instance runs the relay (writes happen either way). |
@@ -302,7 +413,8 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
 
 - common-core: `CommonCoreIsFrameworkFreeTest` (every class of the module against
   the allowed references; `security.core` against the stricter rule);
-  `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `PublicUrlPolicyTest`.
+  `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `PublicUrlPolicyTest`,
+  `TrustedProxiesTest`, `ClientIpTest`.
 - common-web: `SecurityCoreDelegationTest` (the Spring classes delegate to the
   credential rules); `JwtAuthenticationFilterTest` (who gets a session, who gets
   401, who continues unauthenticated); `AccessTokenRevocationTest` (the filter with
@@ -311,11 +423,19 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   `@Enable*` imports keep the bean names of the former component scans);
   `SecurityErrorAnswersTest`, `GeneratedUserFilterTest`, `DefaultCacheManagerTest`,
   `ScopeRulesTest`, `ListScopeTest`, `ChannelSecretsTest`, `MailSecretsTest`,
-  `ForwardedAuthFeignConfigTest`.
+  `ForwardedAuthFeignConfigTest`; the shared helpers (ARC-11):
+  `InternalEndpointGuardTest`, `InternalEndpointGuardConfigTest`,
+  `InternalServiceTokenTest`, `SessionsTest`, `ClientIpResolverTest`,
+  `GlobalExceptionHandlerTest` (every handler called directly, the hooks, the hide
+  flag, a subclass replacing the base), `ServiceCallsTest` (against a local
+  server), `MailSecretsConfigTest`, `PublicOnlyDnsResolverTest`,
+  `PinnedHttpClientsTest`, `BoundedDownloadsTest`, `DnsRebindingTest` (needs
+  `127.0.0.2` on the loopback interface, as on Linux; skipped elsewhere).
 - common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
   `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
   health and gauges, and that it stays off without the property);
-  `RabbitPublishingAutoConfigurationTest`, `NotificationPublisherTest`.
+  `RabbitPublishingAutoConfigurationTest`, `NotificationPublisherTest`,
+  `DeadLetterQueueGaugeTest`.
 
 `mvn verify` also runs common-messaging's `ActivityOutboxIT` (Testcontainers:
 Postgres and RabbitMQ): a rollback writes and sends nothing, a commit sends exactly

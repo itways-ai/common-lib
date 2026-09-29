@@ -35,7 +35,9 @@ class EnableAnnotationsBeanNamesTest {
                             .hasBean("jwtTokenProvider").hasBean("internalServiceToken")
                             .hasBean("jwtAuthenticationFilter").hasBean("apiKeyAuthenticationFilter")
                             .hasBean("accountIdWebMvcConfig").hasBean("securityErrorHandlingConfig")
-                            .hasBean("apiResponseAuthenticationEntryPoint").hasBean("apiResponseAccessDeniedHandler");
+                            .hasBean("apiResponseAuthenticationEntryPoint").hasBean("apiResponseAccessDeniedHandler")
+                            // ARC-11: the client-IP resolver and the service-call builder come with it
+                            .hasBean("clientIpResolver").hasBean("serviceCallsConfig").hasBean("serviceCalls");
 
                     // @EnableCache, through @EnableCustomSecurity
                     assertThat(context).hasBean("cacheConfig").hasBean("cacheProviderConfig")

@@ -7,6 +7,9 @@ import com.itways.security.core.SecurityMessages;
 
 import jakarta.validation.ConstraintViolationException;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -38,9 +41,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The platform's shared error mapping (AS-13), for every service that has no
- * more specific advice of its own (account-service and auth-service run theirs
- * ahead of this one).
+ * The platform's shared error mapping (AS-13), for every service.
  *
  * <p>Previously every framework exception fell into the catch-all as HTTP 500
  * with {@code ex.getMessage()} in the body — raw SQL, constraint names, Java
@@ -56,24 +57,70 @@ import java.util.UUID;
  * <p>Imported by {@code CommonConfig}; the {@code @Component} name is the one
  * the former component scan gave, so a service that refers to the bean by name
  * still finds it.
+ *
+ * <p><b>Overridable (ARC-11).</b> A service that needs its own codes or
+ * messages no longer copies the class: it registers a subclass
+ * ({@code class AccountExceptionHandler extends GlobalExceptionHandler}, a
+ * {@code @RestControllerAdvice} of its own) and overrides what differs. Every
+ * {@code @ExceptionHandler} method is public and overridable (Spring finds the
+ * annotation on the overridden superclass method), and the shared shapes are
+ * protected hooks: {@link #error}, {@link #validationFailed},
+ * {@link #newReference}, {@link #clientErrorCode} and
+ * {@link #hideServerErrorMessages}. The base is
+ * {@code @ConditionalOnMissingBean(GlobalExceptionHandler.class)}, so the
+ * subclass replaces it instead of running beside it. Defaults are unchanged:
+ * a service that overrides nothing gets exactly the answers it got before.
+ *
+ * <p>{@code itways.errors.hide-server-error-messages} (default {@code false}):
+ * when {@code true}, a {@link BusinessException} with a 5xx status answers its
+ * own status with the fixed text {@code Internal server error (reference X)}
+ * and code {@code INTERNAL_SERVER_ERROR}, and the real message is logged with
+ * the reference (the account/auth rule); when {@code false} the thrower's
+ * message is returned as it always was.
  */
 @Slf4j
 @RestControllerAdvice
 @Component("globalExceptionHandler")
+@ConditionalOnMissingBean(GlobalExceptionHandler.class)
 public class GlobalExceptionHandler {
 
-    static final String VALIDATION_ERROR = "VALIDATION_ERROR";
-    static final String NOT_FOUND_MESSAGE = "The requested resource was not found";
-    static final String NOT_FOUND_CODE = "NOT_FOUND";
-    static final String INTERNAL_ERROR_CODE = "INTERNAL_SERVER_ERROR";
+    public static final String HIDE_SERVER_ERROR_MESSAGES_PROPERTY = "itways.errors.hide-server-error-messages";
+
+    public static final String VALIDATION_ERROR = "VALIDATION_ERROR";
+    public static final String VALIDATION_FAILED_MESSAGE = "Validation Failed";
+    public static final String NOT_FOUND_MESSAGE = "The requested resource was not found";
+    public static final String NOT_FOUND_CODE = "NOT_FOUND";
+    public static final String INTERNAL_ERROR_CODE = "INTERNAL_SERVER_ERROR";
+
+    private final boolean hideServerErrorMessages;
+
+    /** Today's defaults: 5xx business messages are returned as thrown. */
+    public GlobalExceptionHandler() {
+        this(false);
+    }
+
+    @Autowired
+    public GlobalExceptionHandler(
+            @Value("${" + HIDE_SERVER_ERROR_MESSAGES_PROPERTY + ":false}") boolean hideServerErrorMessages) {
+        this.hideServerErrorMessages = hideServerErrorMessages;
+    }
 
     /**
-     * Unchanged: the message and code are the thrower's deliberate, client-facing
-     * text, whatever the status.
+     * The message and code are the thrower's deliberate, client-facing text,
+     * whatever the status — unless {@link #hideServerErrorMessages()} and the
+     * status is 5xx: then a fixed text with a reference, and the real message
+     * goes to the log.
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
         if (ex.getHttpStatus() >= 500) {
+            if (hideServerErrorMessages()) {
+                String reference = newReference();
+                log.error("Business exception with status {} ({}) (reference {}): {}", ex.getHttpStatus(),
+                        ex.getErrorCode(), reference, ex.getMessage(), ex);
+                return error(HttpStatusCode.valueOf(ex.getHttpStatus()),
+                        "Internal server error (reference " + reference + ")", INTERNAL_ERROR_CODE);
+            }
             log.warn("Business exception with status {} ({}): {}", ex.getHttpStatus(), ex.getErrorCode(),
                     ex.getMessage());
         }
@@ -214,22 +261,52 @@ public class GlobalExceptionHandler {
             if (ex instanceof ResponseStatusException rse && rse.getReason() != null) {
                 message = rse.getReason();
             }
-            return ResponseEntity.status(status).body(ApiResponse.error(message, "HTTP_" + status.value()));
+            return error(status, message, clientErrorCode(status));
         }
-        String reference = UUID.randomUUID().toString();
+        String reference = newReference();
         log.error("Unhandled exception (reference {})", reference, ex);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error (reference " + reference + ")",
                 INTERNAL_ERROR_CODE);
     }
 
-    private static ResponseEntity<ApiResponse<Map<String, String>>> validationFailed(Map<String, String> errors) {
-        ApiResponse<Map<String, String>> response = ApiResponse.success("Validation Failed", errors);
+    // ── Hooks for subclasses ───────────────────────────────────────────────────
+
+    /** The 400 {@code VALIDATION_ERROR} answer: field → message in {@code data}. */
+    protected ResponseEntity<ApiResponse<Map<String, String>>> validationFailed(Map<String, String> errors) {
+        ApiResponse<Map<String, String>> response = ApiResponse.success(VALIDATION_FAILED_MESSAGE, errors);
         response.setStatus("error");
         response.setErrorCode(VALIDATION_ERROR);
         return ResponseEntity.badRequest().body(response);
     }
 
-    private static ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message, String errorCode) {
+    /** An error answer in the envelope; every fixed-text handler ends here. */
+    protected ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message, String errorCode) {
+        return error((HttpStatusCode) status, message, errorCode);
+    }
+
+    /** As {@link #error(HttpStatus, String, String)}, for a status outside the {@link HttpStatus} enum. */
+    protected ResponseEntity<ApiResponse<Void>> error(HttpStatusCode status, String message, String errorCode) {
         return ResponseEntity.status(status).body(ApiResponse.error(message, errorCode));
+    }
+
+    /** The reference a caller can quote from a 5xx body; the log carries the same one. A UUID. */
+    protected String newReference() {
+        return UUID.randomUUID().toString();
+    }
+
+    /**
+     * The error code of a framework 4xx the catch-all lets through:
+     * {@code HTTP_<status>}. auth-service answers {@link HttpStatus#name()}.
+     */
+    protected String clientErrorCode(HttpStatusCode status) {
+        return "HTTP_" + status.value();
+    }
+
+    /**
+     * Whether a 5xx {@link BusinessException} hides its message behind a
+     * reference; {@code itways.errors.hide-server-error-messages} by default.
+     */
+    protected boolean hideServerErrorMessages() {
+        return hideServerErrorMessages;
     }
 }

@@ -73,9 +73,9 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
                     // Store accountId and keyVersion in details
                     authentication.setDetails(Map.of(
-                            "accountId", accountId,
-                            "keyVersion", String.valueOf(keyVersion),
-                            "authSource", "API_KEY"));
+                            Sessions.DETAIL_ACCOUNT_ID, accountId,
+                            Sessions.DETAIL_KEY_VERSION, String.valueOf(keyVersion),
+                            Sessions.DETAIL_AUTH_SOURCE, Sessions.AUTH_SOURCE_API_KEY));
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     apiKeyStatusStore.recordUse(keyHash);

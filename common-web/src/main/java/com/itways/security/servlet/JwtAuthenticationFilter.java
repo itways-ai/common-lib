@@ -131,9 +131,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			// refuse a credential that is merely valid — a webhook token is
 			// still the whole tenant, so anything destructive should look.
 			authentication.setDetails(Map.of(
-					"accountId", accountId,
-					"tokenType", tokenType == null ? JwtTokenProvider.TYPE_ACCESS : tokenType,
-					"remoteAddress", String.valueOf(request.getRemoteAddr())));
+					Sessions.DETAIL_ACCOUNT_ID, accountId,
+					Sessions.DETAIL_TOKEN_TYPE, tokenType == null ? JwtTokenProvider.TYPE_ACCESS : tokenType,
+					Sessions.DETAIL_REMOTE_ADDRESS, String.valueOf(request.getRemoteAddr())));
 
 			SecurityContextHolder.getContext().setAuthentication(authentication);
 		}

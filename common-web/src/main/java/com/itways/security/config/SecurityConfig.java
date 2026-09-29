@@ -11,7 +11,9 @@ import com.itways.security.SessionRevocationStore;
 import com.itways.security.internal.InternalServiceToken;
 import com.itways.security.jwt.JwtTokenProvider;
 import com.itways.security.servlet.ApiKeyAuthenticationFilter;
+import com.itways.security.servlet.ClientIpResolver;
 import com.itways.security.servlet.JwtAuthenticationFilter;
+import com.itways.web.client.ServiceCallsConfig;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * What {@code @EnableCustomSecurity} brings. Listed explicitly (it used to
  * component-scan {@code com.itways.security}); the bean names are the ones the
- * scan gave.
+ * scan gave. {@link ClientIpResolver} and {@link ServiceCallsConfig} (ARC-11)
+ * are plain helpers with no side effects: a bean each, nothing switched on.
  */
 @Slf4j
 @Configuration
@@ -27,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 @Import({ SecurityUtils.class, ApiKeyProvider.class, ApiKeyStatusStore.class, ApiKeyRevocationStore.class,
 		SessionRevocationStore.class, JwtTokenProvider.class, InternalServiceToken.class,
 		JwtAuthenticationFilter.class, ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class,
-		SecurityErrorHandlingConfig.class })
+		SecurityErrorHandlingConfig.class, ClientIpResolver.class, ServiceCallsConfig.class })
 public class SecurityConfig {
 	
 	@PostConstruct
