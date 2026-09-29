@@ -20,7 +20,8 @@
         common-messaging  the RabbitMQ side: activity and notification publishers, the activity outbox
 
         `mvn -f common-lib/pom.xml install` builds and installs all five. This pom aggregates only:
-        it is nobody's parent and holds no dependencies or plugins.
+        it is nobody's parent and holds no dependencies; it names the formatter plugin only so
+        `mvn spotless:check` works from here.
     </description>
 
     <modules>
@@ -30,5 +31,23 @@
         <module>common-web</module>
         <module>common-messaging</module>
     </modules>
+
+    <!--
+        Only so `mvn spotless:apply` / `mvn spotless:check` run from the reactor root: Maven
+        looks the `spotless` prefix up in every module of the reactor, and this pom has no
+        parent to inherit it from. No Java here, so nothing is formatted. Keep the version
+        equal to platform-parent's spotless.version.
+    -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>2.46.1</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 </project>
