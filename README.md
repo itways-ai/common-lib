@@ -1,17 +1,29 @@
 # common-lib
 
-The shared Java library of the platform's Spring Boot services: credential checks,
-the response envelope and error handling, tenant scoping, caching, messaging
-contracts and secret sealing. Every backend service depends on it; the
-api-gateway depends only on its framework-free `security-core` jar.
+The shared Java code of the platform's Spring Boot services, built as one Maven
+reactor of five modules: the parent POM and BOM every service builds with, and the
+shared library split in three jars by what they need at runtime.
 
-- Group / artifact: `com.itways:common-lib`
-- Java 21, Spring Boot 3.2.x (the version is set by `spring-boot.version` in `pom.xml`)
+| Module | Coordinates | What it is |
+| --- | --- | --- |
+| `platform-bom` | `com.itways:platform-bom` (pom) | The versions of every in-house library (`common-core`, `common-web`, `common-messaging`, `ai-engine-sdk`, `file-storage-sdk`, `journey-model`, `journey-engine-sdk`). |
+| `platform-parent` | `com.itways:platform-parent` (pom) | The parent of every service and library: `spring-boot-starter-parent` 3.2.2, the imported BOMs (resilience4j, Spring Cloud, Testcontainers, AWS SDK, `platform-bom`), the pins Boot does not manage (jjwt, MapStruct, Lombok, springdoc, ArchUnit) and the plugins every build runs (JaCoCo, surefire, failsafe, sources jar). `spring-boot-maven-plugin` and Spotless are configured but not activated. |
+| `common-core` | `com.itways:common-core` | Framework-free: the credential rules (`security.core`), the contracts services exchange, the response envelope, error codes and exceptions, the public-URL policy, UTC time handling. Depends on jjwt and Jackson annotations only. The api-gateway (WebFlux) uses this one. |
+| `common-web` | `com.itways:common-web` | The Spring MVC side: security filters and stores, `@AccountId` and `@RequestedScope`, assistant scope rules, caching, encryption and secret sealing, the shared error handling, OpenAPI helpers, and the opt-in Feign, FreeMarker and JPA-auditing integrations. Depends on `common-core`. |
+| `common-messaging` | `com.itways:common-messaging` | The RabbitMQ side: JSON conversion, publisher confirms and returns, the activity and notification publishers with their DTOs, the transactional activity outbox. Depends on `common-core`. |
+
+`common-web` and `common-messaging` do not depend on each other; a service takes the
+ones it needs. All five share one version (`2.0.0`). Java 21, Spring Boot 3.2.x.
+
+The packages did not move with the split: `com.itways.*` names are the same as in
+`common-lib` 1.x, only the jar that holds them changed. Two packages are spread over
+two jars (`com.itways.annotation`, `com.itways.common`); that is fine on a classpath.
 
 ## Build
 
 The library is not published to a remote repository. Install it into the local
-Maven repository **before** building any service:
+Maven repository **before** building any service; the root pom aggregates the five
+modules and builds them in order:
 
 ```bash
 mvn -f common-lib/pom.xml install          # runs the tests; -DskipTests to skip them
@@ -19,74 +31,106 @@ mvn -f common-lib/pom.xml install          # runs the tests; -DskipTests to skip
 
 `docker/java/Dockerfile` does the same in its `libs` stage, and each service's
 CI installs it first. On a host whose JDK is newer than 21, Lombok fails with
-"cannot find symbol"; build in the `maven:3.9-eclipse-temurin-21` image.
+"cannot find symbol"; build with JDK 21 (or in the `maven:3.9-eclipse-temurin-21` image).
 
-`install` produces three jars:
+`install` produces, per module, `<module>-<v>.jar` and `<module>-<v>-sources.jar`,
+plus the two poms:
 
-| Jar | Contents | Used by |
-| --- | --- | --- |
-| `common-lib-<v>.jar` | everything below | account, auth, channels, journey, notification, speech, template |
-| `common-lib-<v>-security-core.jar` | only `com.itways.security.core` and `contracts.channels.ChannelWebhookTokenClaims` | api-gateway (WebFlux) |
-| `common-lib-<v>-sources.jar` | sources | IDEs |
+| Artifact | Used by |
+| --- | --- |
+| `common-core-<v>.jar` | every service, and the api-gateway (WebFlux) on its own |
+| `common-web-<v>.jar` | account, auth, channels, journey, notification, speech, template |
+| `common-messaging-<v>.jar` | every service that publishes activity or notifications |
+| `platform-parent-<v>.pom`, `platform-bom-<v>.pom` | every service's `<parent>`; the BOM through it |
+
+The former `common-lib-<v>-security-core.jar` classifier is gone: `common-core` is
+that jar, complete.
+
+Formatting is not part of the build. `.editorconfig` states the rules (4 spaces, LF,
+final newline); `mvn spotless:apply` applies them on demand (the plugin is configured
+in `platform-parent`, not bound to any phase).
 
 ## Version policy
 
-- All services pin the same version (`1.0.13` today). A change that alters behaviour
+- The five modules share one version, and all services pin it through
+  `platform-bom` (imported by `platform-parent`). A change that alters behaviour
   every service sees (a startup check, a new default) is announced in the open-points
   tracker and verified against every consumer's test suite before it is copied in.
-- Bump the version when a change breaks a consumer's compile or needs a consumer-side
-  change; update every `pom.xml` that pins it (the gateway's `common-lib.version`
-  property included) in the same change.
-- Keep `com.itways.security.core` framework-free (`SecurityCoreIsFrameworkFreeTest`):
-  the gateway loads it without Spring MVC. The gateway's `CommonLibCompatibilityTest`
-  checks that both jars judge credentials alike.
+- Every release bumps the version and git-tags the repository (`v<version>`); the
+  new version goes into `platform-bom`, and the services move by updating their
+  `platform-parent` version. Bump when a change breaks a consumer's compile or needs
+  a consumer-side change.
+- Keep `common-core` framework-free (`CommonCoreIsFrameworkFreeTest` checks every
+  class of the module against the JDK, jjwt, Jackson annotations and the optional
+  swagger annotations, and holds `com.itways.security.core` to the stricter rule: no
+  Lombok, no logging, nothing but the JDK and jjwt). The gateway loads it without
+  Spring MVC; the gateway's `CommonLibCompatibilityTest` checks that the edge and the
+  services judge credentials alike.
 
 ## How a service opts in
 
 Nothing is active just by being on the classpath except what is listed under
-"Always on". The rest is switched on with an annotation on the application class:
+"Always on". The rest is switched on with an annotation on the application class.
+Each configuration imports its classes explicitly (no component scan), under the
+bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 
-| Annotation | Imports | What the service gets |
-| --- | --- | --- |
-| `@EnableCommon` | `common.config.CommonConfig` | `ApiResponse` / `PageResponse`, `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, UTC time, RestTemplate, OpenAPI schema helpers |
-| `@EnableCustomSecurity` | `security.config.SecurityConfig` (scans `com.itways.security`) + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers |
-| `@EnableCache` | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
-| `@EnableAssistantScope` | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`) |
-| `@EnableActivity` | `activity.config.ActivityConfig` | `ActivityEventPublisher` (account activity over RabbitMQ); with `itways.activity.outbox.enabled=true` also `ActivityOutbox` and its relay (see "Activity outbox") |
-| `@EnableNotifications` | `notification.config.NotificationConfig` | `NotificationPublisher`, `notification.queue` (declared argument-free: every sender declares it) |
-| `@EnableEncryption` | `encryption.EncryptionConfig` (scans `com.itways.encryption`) | `EncryptionService`, `RsaService` and the sealing helpers of that package |
-| `@EnableForwardedAuth` | `feign.ForwardedAuthFeignConfig` | Feign interceptor that forwards the caller's credential and `X-Service-Token` (needs Feign) |
-| `@EnableFreeMarker` | `freemarker.FreeMarkerConfig` | `TemplateRender` |
-| `@EnableAccountAuditing` | `jpa.AccountAuditingConfig` | JPA auditing of the account id (needs Spring Data JPA) |
+| Annotation | Module | Imports | What the service gets |
+| --- | --- | --- | --- |
+| `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC). `ApiResponse` / `PageResponse` are plain classes in common-core. |
+| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers |
+| `@EnableCache` | common-web | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
+| `@EnableAssistantScope` | common-web | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`; spring-jdbc is optional here) |
+| `@EnableEncryption` | common-web | `encryption.EncryptionConfig` | `RsaService` (the `EncryptionService`); `ChannelSecrets` and `MailSecrets` are static helpers of that package |
+| `@EnableForwardedAuth` | common-web | `feign.ForwardedAuthFeignConfig` | Feign interceptor that forwards the caller's credential and `X-Service-Token` (needs Feign on the service's classpath; the configuration backs off without it) |
+| `@EnableFreeMarker` | common-web | `freemarker.FreeMarkerConfig` | `TemplateRender` (needs `spring-boot-starter-freemarker` on the service's classpath; backs off without it) |
+| `@EnableAccountAuditing` | common-web | `jpa.AccountAuditingConfig` | JPA auditing of the account id (needs Spring Data JPA on the service's classpath; backs off without it) |
+| `@EnableActivity` | common-messaging | `activity.config.ActivityConfig` | `ActivityEventPublisher` (account activity over RabbitMQ); with `itways.activity.outbox.enabled=true` also `ActivityOutbox` and its relay (see "Activity outbox"; needs spring-jdbc and spring-tx, optional here) |
+| `@EnableNotifications` | common-messaging | `notification.config.NotificationConfig` | `NotificationPublisher`, `notification.queue` (declared argument-free: every sender declares it) |
 
 A service's own `SecurityFilterChain` decides who may call what; common-lib's filters
 only establish who the caller is.
 
+Not provided any more (since 2.0.0): the `restTemplate` bean of `@EnableCommon` (a
+service that needs a `RestTemplate` declares its own) and `RefGenerator`. The
+library's `application.properties` (RabbitMQ `guest` defaults, ANSI output) and
+`banner.txt` are gone too; every service ships its own properties, and the banner
+is now Spring Boot's.
+
 ### Always on (auto-configuration)
 
-- `cache.config.CacheAutoConfiguration`: the cache beans, ordered before Spring
-  Boot's cache auto-configuration.
-- `common.config.SwaggerConfig`.
-- `security.config.GeneratedUserFilter` (`META-INF/spring.factories`): leaves out
-  Spring Boot's `UserDetailsServiceAutoConfiguration`, see below.
+- common-web, `META-INF/spring/…AutoConfiguration.imports`:
+  `cache.config.CacheAutoConfiguration` (the cache beans, ordered before Spring
+  Boot's cache auto-configuration) and `common.config.SwaggerConfig`.
+- common-web, `META-INF/spring.factories`: `security.config.GeneratedUserFilter`
+  leaves out Spring Boot's `UserDetailsServiceAutoConfiguration`, see below.
+- common-messaging, `AutoConfiguration.imports`:
+  `messaging.RabbitPublishingAutoConfiguration` logs publisher nacks and returns.
+- common-messaging, `spring.factories`: `messaging.RabbitPublishingDefaults`
+  (an `EnvironmentPostProcessor`) turns on correlated publisher confirms, returns
+  and mandatory publishing for every service's RabbitMQ connection (PLT-30); a
+  service's own setting wins.
 
 ## Packages
 
-| Package | What it holds |
-| --- | --- |
-| `security.core` | Framework-free credential rules: `TokenVerifier` (JWT, platform and channel-webhook keys, rotation), `ApiKeyCodec` (`X-API-KEY` format), `CredentialCrypto` (AES-256-GCM, SHA-256), `PublicKeys`. Packaged alone as the `security-core` jar. |
-| `security`, `security.jwt`, `security.servlet` | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`. |
-| `security.internal` | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). |
-| `security.config`, `security.resolver`, `security.annotation` | Security wiring, `@AccountId`. |
-| `scope` | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`. |
-| `cache` | `CacheStore` / `CacheStoreFactory` with Ehcache, Redis and hybrid stores; `CacheProperties`. |
-| `amqp`, `notification`, `activity` | RabbitMQ JSON conversion; notification and activity publishers and their DTOs. |
-| `activity.outbox` | The transactional outbox for activity events: `ActivityOutbox`, `ActivityOutboxRelay`, `ActivityOutboxStore`, `RabbitConfirmedSender`, the health indicator and gauges. |
-| `contracts` | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). |
-| `encryption` | `ChannelSecrets` (`CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords), `EncryptionService`, `RsaService`. |
-| `common.net` | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). |
-| `common` | Envelope, error codes, exception handlers, time and ref utilities. |
-| `feign`, `freemarker`, `jpa` | The opt-in integrations above. |
+| Package | Module | What it holds |
+| --- | --- | --- |
+| `security.core` | core | Framework-free credential rules: `TokenVerifier` (JWT, platform and channel-webhook keys, rotation), `ApiKeyCodec` (`X-API-KEY` format), `CredentialCrypto` (AES-256-GCM, SHA-256), `PublicKeys`, `SecurityMessages`. |
+| `contracts` | core | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). Their `@Schema` descriptions feed the portal's OpenAPI specs; the annotation library is optional. |
+| `common.response`, `common.constants`, `common.exception` | core | Envelope (`ApiResponse`, `PageResponse`), error codes, `BusinessException`, `InvalidApiKeyException`. |
+| `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). |
+| `common.util` | core | `UtcDateTimes`. |
+| `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`. |
+| `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). |
+| `security.config`, `security.resolver`, `security.annotation` | web | Security wiring, `@AccountId`. |
+| `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`. |
+| `cache` | web | `CacheStore` / `CacheStoreFactory` with Ehcache, Redis and hybrid stores; `CacheProperties`. |
+| `encryption` | web | `ChannelSecrets` (`CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords), `EncryptionService`, `RsaService`. |
+| `common.config`, `common.handler` | web | `CommonConfig`, `SwaggerConfig`, `TimeConfig`, the OpenAPI customizers; the exception handlers and `/error` controller. |
+| `feign`, `freemarker`, `jpa` | web | The opt-in integrations above. |
+| `annotation` | web + messaging | The `@Enable*` annotations; `EnableActivity` and `EnableNotifications` ship in common-messaging, the rest in common-web. |
+| `amqp`, `messaging` | messaging | RabbitMQ JSON conversion; publisher confirms and returns. |
+| `notification`, `activity` | messaging | Notification and activity publishers and their DTOs. |
+| `activity.outbox` | messaging | The transactional outbox for activity events: `ActivityOutbox`, `ActivityOutboxRelay`, `ActivityOutboxStore`, `RabbitConfirmedSender`, the health indicator and gauges. |
 
 ## Security defaults
 
@@ -156,7 +200,7 @@ Redis entry, written only by auth-service:
 
 Spring Boot creates an in-memory user and logs "Using generated security password"
 whenever a service has no `UserDetailsService`, which is every platform service.
-`GeneratedUserFilter` leaves that auto-configuration out wherever common-lib is on the
+`GeneratedUserFilter` leaves that auto-configuration out wherever common-web is on the
 classpath, test slices included. A service's own `exclude` of it still works. To get
 Boot's user back: `itways.security.default-user.enabled=true`.
 
@@ -254,20 +298,28 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
 
 ## Tests
 
-`mvn test` runs the library's unit tests, among them:
+`mvn test` runs each module's unit tests, among them:
 
-- `SecurityCoreIsFrameworkFreeTest`: `security.core` imports nothing but the JDK and jjwt.
-- `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `SecurityCoreDelegationTest`: the credential rules and the Spring classes that delegate to them.
-- `JwtAuthenticationFilterTest`: who gets a session, who gets 401, who continues unauthenticated.
-- `AccessTokenRevocationTest`: the filter with the real `SessionRevocationStore` on a mocked Redis (revoked session, cut-off, no `sid`, Redis down, no Redis).
-- `JwtTokenProviderStartupTest`: missing or broken keys fail the startup.
-- `SecurityErrorAnswersTest`, `GeneratedUserFilterTest`, `DefaultCacheManagerTest`.
-- `ScopeRulesTest`, `ListScopeTest`, `ChannelSecretsTest`, `MailSecretsTest`, `PublicUrlPolicyTest`, `NotificationPublisherTest`.
-- `ActivityOutboxTest`, `ActivityOutboxRelayTest`, `ActivityOutboxConfigTest`: the outbox's transaction rules, retries and backoff, health and gauges, and that it stays off without the property.
+- common-core: `CommonCoreIsFrameworkFreeTest` (every class of the module against
+  the allowed references; `security.core` against the stricter rule);
+  `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `PublicUrlPolicyTest`.
+- common-web: `SecurityCoreDelegationTest` (the Spring classes delegate to the
+  credential rules); `JwtAuthenticationFilterTest` (who gets a session, who gets
+  401, who continues unauthenticated); `AccessTokenRevocationTest` (the filter with
+  the real `SessionRevocationStore` on a mocked Redis); `JwtTokenProviderStartupTest`
+  (missing or broken keys fail the startup); `EnableAnnotationsBeanNamesTest` (the
+  `@Enable*` imports keep the bean names of the former component scans);
+  `SecurityErrorAnswersTest`, `GeneratedUserFilterTest`, `DefaultCacheManagerTest`,
+  `ScopeRulesTest`, `ListScopeTest`, `ChannelSecretsTest`, `MailSecretsTest`,
+  `ForwardedAuthFeignConfigTest`.
+- common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
+  `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
+  health and gauges, and that it stays off without the property);
+  `RabbitPublishingAutoConfigurationTest`, `NotificationPublisherTest`.
 
-`mvn verify` also runs `ActivityOutboxIT` (Testcontainers: Postgres and RabbitMQ): a
-rollback writes and sends nothing, a commit sends exactly once, a broker outage keeps
-the rows and sends them after recovery, two relays never send one row twice, sent rows
-go after the retention.
+`mvn verify` also runs common-messaging's `ActivityOutboxIT` (Testcontainers:
+Postgres and RabbitMQ): a rollback writes and sends nothing, a commit sends exactly
+once, a broker outage keeps the rows and sends them after recovery, two relays never
+send one row twice, sent rows go after the retention.
 
 A change here is verified against every consumer's own suite before it ships.

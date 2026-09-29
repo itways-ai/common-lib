@@ -1,317 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.itways</groupId>
-	<artifactId>common-lib</artifactId>
-	<version>1.0.13</version>
-	<packaging>jar</packaging>
+    <groupId>com.itways</groupId>
+    <artifactId>common-lib-reactor</artifactId>
+    <version>2.0.0</version>
+    <packaging>pom</packaging>
 
-	<name>common-lib</name>
-	<description>Shared common library for backend services</description>
+    <name>common-lib</name>
+    <description>
+        The platform's shared Java code, built as one reactor. The layout:
 
-	<properties>
-		<java.version>21</java.version>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        platform-bom      the versions of every in-house library (imported by platform-parent)
+        platform-parent   the parent of every service and library: Spring Boot, imported BOMs, pins, plugins
+        common-core       framework-free: credential rules, service contracts, the response envelope, errors
+        common-web        the Spring MVC side: security filters, scope, cache, encryption, error handling, OpenAPI
+        common-messaging  the RabbitMQ side: activity and notification publishers, the activity outbox
 
-		<!-- Spring Boot version -->
-		<spring-boot.version>3.2.2</spring-boot.version>
+        `mvn -f common-lib/pom.xml install` builds and installs all five. This pom aggregates only:
+        it is nobody's parent and holds no dependencies or plugins.
+    </description>
 
-		<!-- Other dependencies -->
-		<lombok.version>1.18.30</lombok.version>
-		<jjwt.version>0.12.3</jjwt.version>
-		<jakarta.servlet.version>6.0.0</jakarta.servlet.version>
-		<springdoc.version>2.3.0</springdoc.version>
-	</properties>
-
-	<dependencyManagement>
-		<dependencies>
-			<!-- Before Spring Boot's BOM: Boot 3.2 pins Testcontainers 1.19, whose Docker API
-			     version Docker 29 refuses (test scope only, for ActivityOutboxIT). -->
-			<dependency>
-				<groupId>org.testcontainers</groupId>
-				<artifactId>testcontainers-bom</artifactId>
-				<version>1.21.4</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-			<dependency>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-dependencies</artifactId>
-				<version>${spring-boot.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
-
-	<dependencies>
-		<!-- Spring Boot Starters -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-amqp</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-freemarker</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-cache</artifactId>
-		</dependency>
-
-		<!-- REDIS -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-redis</artifactId>
-		</dependency>
-
-		<!-- Jakarta Servlet API (provided scope - not bundled) -->
-		<dependency>
-			<groupId>jakarta.servlet</groupId>
-			<artifactId>jakarta.servlet-api</artifactId>
-			<version>${jakarta.servlet.version}</version>
-			<scope>provided</scope>
-		</dependency>
-
-		<!-- JWT -->
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-api</artifactId>
-			<version>${jjwt.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-impl</artifactId>
-			<version>${jjwt.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-		<dependency>
-			<groupId>io.jsonwebtoken</groupId>
-			<artifactId>jjwt-jackson</artifactId>
-			<version>${jjwt.version}</version>
-			<scope>runtime</scope>
-		</dependency>
-
-		<!-- Lombok -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<version>${lombok.version}</version>
-			<scope>provided</scope>
-		</dependency>
-
-		<!-- Jackson for JSON processing -->
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-		</dependency>
-
-		<!-- Swagger/OpenAPI -->
-		<dependency>
-			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>${springdoc.version}</version>
-		</dependency>
-
-
-
-		<!-- Bounded default CacheManager for @Cacheable (PLT-22); version from Spring Boot's BOM. -->
-		<dependency>
-			<groupId>com.github.ben-manes.caffeine</groupId>
-			<artifactId>caffeine</artifactId>
-		</dependency>
-
-		<!-- Ehcache for MFA Replay Protection -->
-		<dependency>
-			<groupId>org.ehcache</groupId>
-			<artifactId>ehcache</artifactId>
-			<version>3.10.8</version>
-		</dependency>
-
-		<!-- Instants in the activity outbox's stored JSON (PLT-07); version from Spring Boot's BOM. -->
-		<dependency>
-			<groupId>com.fasterxml.jackson.datatype</groupId>
-			<artifactId>jackson-datatype-jsr310</artifactId>
-		</dependency>
-
-		<!-- Optional: the activity outbox's health indicator and gauges, where the service has Actuator. -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-actuator</artifactId>
-			<optional>true</optional>
-		</dependency>
-		<dependency>
-			<groupId>io.micrometer</groupId>
-			<artifactId>micrometer-core</artifactId>
-			<optional>true</optional>
-		</dependency>
-
-		<!-- Test -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- ActivityOutboxIT: the outbox against a real Postgres and RabbitMQ. -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-jdbc</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>rabbitmq</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- Optional: only for services that opt in with @EnableForwardedAuth (needs Feign on their classpath). Spring Cloud 2023.0.x ships feign 13.1. -->
-	<dependency>
-		<groupId>io.github.openfeign</groupId>
-		<artifactId>feign-core</artifactId>
-		<version>13.1</version>
-		<optional>true</optional>
-	</dependency>
-	<!-- Optional: only for services that opt in with @EnableAccountAuditing (needs Spring Data JPA on their classpath). -->
-	<dependency>
-		<groupId>org.springframework.data</groupId>
-		<artifactId>spring-data-jpa</artifactId>
-		<optional>true</optional>
-	</dependency>
-	<!-- Optional: only for services that opt in with @EnableAssistantScope (reads the assistant_directory view). -->
-	<dependency>
-		<groupId>org.springframework</groupId>
-		<artifactId>spring-jdbc</artifactId>
-		<optional>true</optional>
-	</dependency>
-	</dependencies>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version>
-				<configuration>
-					<source>${java.version}</source>
-					<target>${java.version}</target>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-							<version>${lombok.version}</version>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.2.5</version>
-			</plugin>
-			<!-- *IT classes (Testcontainers) run in `mvn verify`. -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-failsafe-plugin</artifactId>
-				<version>3.1.2</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>integration-test</goal>
-							<goal>verify</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<!--
-				The security-core classifier jar: com.itways.security.core (TokenVerifier,
-				ApiKeyCodec, CredentialCrypto, PublicKeys) and the one constants class it reads,
-				nothing else. No Spring, servlet or MVC classes, no auto-configuration imports and
-				no application.properties, so a WebFlux application (the api-gateway) can use the
-				platform's credential rules. Consumers exclude this pom's transitive dependencies
-				and declare jjwt themselves; see package-info in com.itways.security.core.
-			-->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>3.3.0</version>
-				<executions>
-					<execution>
-						<id>security-core</id>
-						<phase>package</phase>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-						<configuration>
-							<classifier>security-core</classifier>
-							<includes>
-								<include>com/itways/security/core/**</include>
-								<include>com/itways/contracts/channels/ChannelWebhookTokenClaims.class</include>
-							</includes>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>3.3.0</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-
-			<plugin>
-				<groupId>org.jacoco</groupId>
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.13</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>report</id>
-						<phase>test</phase>
-						<goals>
-							<goal>report</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
-	</build>
+    <modules>
+        <module>platform-bom</module>
+        <module>platform-parent</module>
+        <module>common-core</module>
+        <module>common-web</module>
+        <module>common-messaging</module>
+    </modules>
 
 </project>

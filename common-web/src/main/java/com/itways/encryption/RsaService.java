@@ -1,0 +1,135 @@
+package com.itways.encryption;
+
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.Cipher;
+import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.util.Base64;
+
+@Slf4j
+@Service("rsaService")
+public class RsaService implements EncryptionService {
+
+    // Future consideration: Store keys in a secure location (e.g., AWS Secrets
+    // Manager, Azure Key Vault)
+    // For now, we store keys in memory.
+    // also we need to keep in mind the rotation of keys
+
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
+
+    // Empty defaults: a service that never calls encrypt()/decrypt() (it only
+    // @EnableEncryption's transitively) must still boot without the keypair in
+    // its environment. Present-but-unloadable key material still fails startup
+    // loudly; an absent key fails at first use with a clear message instead.
+    @Value("${jwt.rsa.private-key:}")
+    private String privateKeyString;
+
+    @Value("${jwt.rsa.public-key:}")
+    private String publicKeyString;
+
+    @PostConstruct
+    public void loadKeys() {
+        try {
+            java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("RSA");
+
+            if (privateKeyString != null && !privateKeyString.isBlank()) {
+                byte[] privateKeyBytes = Base64.getDecoder().decode(privateKeyString);
+                java.security.spec.PKCS8EncodedKeySpec privateKeySpec = new java.security.spec.PKCS8EncodedKeySpec(
+                        privateKeyBytes);
+                this.privateKey = keyFactory.generatePrivate(privateKeySpec);
+            } else {
+                log.warn("No jwt.rsa.private-key configured — RSA decryption is unavailable in this service.");
+            }
+
+            if (publicKeyString != null && !publicKeyString.isBlank()) {
+                byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyString);
+                java.security.spec.X509EncodedKeySpec publicKeySpec = new java.security.spec.X509EncodedKeySpec(
+                        publicKeyBytes);
+                this.publicKey = keyFactory.generatePublic(publicKeySpec);
+            } else {
+                log.warn("No jwt.rsa.public-key configured — RSA encryption is unavailable in this service.");
+            }
+
+            if (privateKey != null || publicKey != null) {
+                log.info("✅ RSA Keys loaded successfully from configuration.");
+            }
+        } catch (Exception e) {
+            log.error("❌ Failed to load RSA Keys from configuration", e);
+            throw new RuntimeException("Failed to load RSA Keys", e);
+        }
+    }
+
+    // @PostConstruct
+    // public void init() { // TODO: Read from properties files
+    // try {
+    // KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+    // keyGen.initialize(2048);
+    // KeyPair pair = keyGen.generateKeyPair();
+    // this.privateKey = pair.getPrivate();
+    // this.publicKey = pair.getPublic();
+    // log.info("✅ RSA Key Pair generated successfully in-memory.");
+    // } catch (Exception e) {
+    // log.error("❌ Failed to generate RSA Key Pair", e);
+    // throw new RuntimeException("Failed to generate RSA Key Pair", e);
+    // }
+    // }
+
+    @Override
+    public String encrypt(String data) {
+        if (publicKey == null) {
+            throw new IllegalStateException(
+                    "jwt.rsa.public-key is not configured — set RSA_PUBLIC_KEY to use RSA encryption");
+        }
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+            byte[] encryptedBytes = cipher.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+        } catch (Exception e) {
+            log.error("Error encrypting data", e);
+            throw new RuntimeException("Error encrypting data", e);
+        }
+    }
+
+    @Override
+    public String decrypt(String encryptedData) {
+        if (privateKey == null) {
+            throw new IllegalStateException(
+                    "jwt.rsa.private-key is not configured — set RSA_PRIVATE_KEY to use RSA decryption");
+        }
+        try {
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+
+            // Check if data is chunked (contains delimiter '|')
+            if (encryptedData.contains("|")) {
+                String[] chunks = encryptedData.split("\\|");
+                StringBuilder decryptedData = new StringBuilder();
+
+                for (String chunk : chunks) {
+                    byte[] decodedBytes = Base64.getDecoder().decode(chunk);
+                    byte[] decryptedBytes = cipher.doFinal(decodedBytes);
+                    decryptedData.append(new String(decryptedBytes, StandardCharsets.UTF_8));
+                }
+                return decryptedData.toString();
+            }
+
+            // Standard decryption for single chunk
+            byte[] decodedBytes = Base64.getDecoder().decode(encryptedData);
+            byte[] decryptedBytes = cipher.doFinal(decodedBytes);
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            // Usually a client sending a value that was not encrypted with our key: callers
+            // answer 400. One line, no stack trace, never the ciphertext.
+            log.warn("RSA decryption failed ({})", e.getClass().getSimpleName());
+            throw new RuntimeException("Error decrypting data", e);
+        }
+    }
+
+}
