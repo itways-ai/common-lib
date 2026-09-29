@@ -32,6 +32,13 @@
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+        <!--
+            The platform-bom this parent imports. Must equal this reactor's version; bump it
+            with every release. Children re-interpolate ${project.version} as their own
+            version, so it must not be used here.
+        -->
+        <platform-bom.version>2.0.0</platform-bom.version>
+
         <!-- Boot 3.2 pins Testcontainers 1.19, whose Docker API version Docker 29 refuses; Boot honours this property. -->
         <testcontainers.version>1.21.4</testcontainers.version>
 
@@ -92,7 +99,7 @@
             <dependency>
                 <groupId>com.itways</groupId>
                 <artifactId>platform-bom</artifactId>
-                <version>${project.version}</version>
+                <version>${platform-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

@@ -83,7 +83,7 @@ Read from `platform-parent/pom.xml`:
 
 | Artifact | Version |
 | --- | --- |
-| `com.itways:common-core`, `common-web`, `common-messaging` | 2.0.0 (`${project.version}`) |
+| `com.itways:common-core`, `common-web`, `common-messaging` | 2.0.0 (`${platform.version}`, a literal property kept equal to the reactor version) |
 | `com.itways.assistant:ai-engine-sdk` | 1.2.0 |
 | `com.itways.assistant:file-storage-sdk` | 2.0.1 |
 | `com.itways.assistant:journey-model` | 1.0.18 |

@@ -26,23 +26,32 @@
         managed here: they come from Spring Boot, Spring Cloud and the other BOMs that
         platform-parent imports.
     -->
+    <properties>
+        <!--
+            The version of common-lib's modules pinned below. Must equal this reactor's
+            version; bump it with every release. Children re-interpolate ${project.version}
+            as their own version, so it must not be used here.
+        -->
+        <platform.version>2.0.0</platform.version>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
             <!-- common-lib (this repository): the three modules of the shared library. -->
             <dependency>
                 <groupId>com.itways</groupId>
                 <artifactId>common-core</artifactId>
-                <version>${project.version}</version>
+                <version>${platform.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.itways</groupId>
                 <artifactId>common-web</artifactId>
-                <version>${project.version}</version>
+                <version>${platform.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.itways</groupId>
                 <artifactId>common-messaging</artifactId>
-                <version>${project.version}</version>
+                <version>${platform.version}</version>
             </dependency>
 
             <!-- The other in-house libraries, each released from its own repository. -->
