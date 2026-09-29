@@ -2,3 +2,8 @@
 # See com.itways.security.config.GeneratedUserFilter.
 org.springframework.boot.autoconfigure.AutoConfigurationImportFilter=\
 com.itways.security.config.GeneratedUserFilter
+
+# 2.1.0: a start refused by the database names SPRING_DATASOURCE_PASSWORD.
+# See com.itways.common.diagnostics.DatabaseLoginFailureAnalyzer.
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.itways.common.diagnostics.DatabaseLoginFailureAnalyzer
