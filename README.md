@@ -4,6 +4,8 @@ The shared Java code of the platform's Spring Boot services, built as one Maven
 reactor of five modules: the parent POM and BOM every service builds with, and the
 shared library split in three jars by what they need at runtime.
 
+Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md).
+
 | Module | Coordinates | What it is |
 | --- | --- | --- |
 | `platform-bom` | `com.itways:platform-bom` (pom) | The versions of every in-house library (`common-core`, `common-web`, `common-messaging`, `ai-engine-sdk`, `file-storage-sdk`, `journey-model`, `journey-engine-sdk`). |
@@ -29,9 +31,11 @@ modules and builds them in order:
 mvn -f common-lib/pom.xml install          # runs the tests; -DskipTests to skip them
 ```
 
-`docker/java/Dockerfile` does the same in its `libs` stage, and each service's
-CI installs it first. On a host whose JDK is newer than 21, Lombok fails with
-"cannot find symbol"; build with JDK 21 (or in the `maven:3.9-eclipse-temurin-21` image).
+Each service's CI installs it first. The `libs` stage of the workspace's
+`docker/java/Dockerfile` still copies the 1.x `common-lib/src`; it must copy the
+reactor pom and the five module directories instead (MIGRATION-2.0.md, section 6).
+On a host whose JDK is newer than 21, Lombok fails with "cannot find symbol"; build
+with JDK 21 (or in the `maven:3.9-eclipse-temurin-21` image).
 
 `install` produces, per module, `<module>-<v>.jar` and `<module>-<v>-sources.jar`,
 plus the two poms:
@@ -144,10 +148,20 @@ is now Spring Boot's.
 ## Shared helpers (ARC-11)
 
 Eight helpers the services had copied from one another now have one version
-here. Everything is additive: nothing changes for a service until it adopts a
-helper, and a service that adopts one deletes its copy. The rule of each is the
-strictest correct one among the copies; where copies legitimately differed there
-is a knob.
+here. A service that adopts one deletes its copy. Two things change on 2.0.0 for every
+service with `@EnableCustomSecurity` or `@EnableCommon`, before it adopts anything:
+
+- `@EnableCustomSecurity` registers the `clientIpResolver` bean. It reads
+  `itways.client-ip.trusted-proxies` (default `TRUSTED_PROXIES`) at startup, and a host
+  name there fails the startup. A service's own bean named `clientIpResolver` clashes
+  with it (account-service's `activity/ClientIpResolver`): the service does not start
+  until it deletes its copy in the same change.
+- `@EnableCommon` registers the request-id filter: every response carries
+  `X-Request-Id`, and error bodies carry `reference` (see "Request correlation").
+  `itways.request-id.enabled=false` opts out.
+
+Everything else here is opt-in. The rule of each helper is the strictest correct
+one among the copies; where copies legitimately differed there is a knob.
 
 | Helper | Module, package | How to enable | Replaces |
 | --- | --- | --- | --- |
@@ -519,7 +533,8 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   (missing or broken keys fail the startup); `EnableAnnotationsBeanNamesTest` (the
   `@Enable*` imports keep the bean names of the former component scans);
   `SecurityErrorAnswersTest`, `GeneratedUserFilterTest`, `DefaultCacheManagerTest`,
-  `ScopeRulesTest`, `ListScopeTest`, `ChannelSecretsTest`, `MailSecretsTest`,
+  `JwtTokenProviderWebhookRotationTest`, `ScopeRulesTest`, `ListScopeTest`,
+  `ChannelSecretsTest`, `MailSecretsTest`,
   `ForwardedAuthFeignConfigTest`; the shared helpers (ARC-11):
   `InternalEndpointGuardTest`, `InternalEndpointGuardConfigTest`,
   `InternalServiceTokenTest`, `SessionsTest`, `ClientIpResolverTest`,
@@ -545,5 +560,15 @@ Postgres and RabbitMQ): a rollback writes and sends nothing, a commit sends exac
 once, a broker outage keeps the rows and sends them after recovery, two relays never
 send one row twice, sent rows go after the retention, and the request id recorded
 with an event arrives as its `x-request-id` header.
+
+Test counts at 2.0.0 (`mvn verify`):
+
+| Module | Unit tests (surefire) | Integration tests (failsafe) |
+| --- | --- | --- |
+| common-core | 60 | none |
+| common-web | 204, of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
+| common-messaging | 58 | 10 (`ActivityOutboxIT`) |
+
+332 in all.
 
 A change here is verified against every consumer's own suite before it ships.
