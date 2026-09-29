@@ -17,8 +17,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
  * component-scanning their packages (ARC-10). A class registered through
  * {@code @Import} would get its fully-qualified name as bean name, so every
  * formerly scanned class names itself: this pins the names a service may refer
- * to, and the two beans that went on purpose ({@code restTemplate},
- * {@code refGenerator}).
+ * to, and the beans that went on purpose ({@code restTemplate},
+ * {@code refGenerator}, and in 2.1.0 {@code apiKeyRevocationStore}).
  */
 class EnableAnnotationsBeanNamesTest {
 
@@ -31,7 +31,7 @@ class EnableAnnotationsBeanNamesTest {
 
                     // @EnableCustomSecurity
                     assertThat(context).hasBean("securityUtils").hasBean("apiKeyProvider").hasBean("apiKeyStatusStore")
-                            .hasBean("apiKeyRevocationStore").hasBean("sessionRevocationStore")
+                            .hasBean("sessionRevocationStore")
                             .hasBean("jwtTokenProvider").hasBean("internalServiceToken")
                             .hasBean("jwtAuthenticationFilter").hasBean("apiKeyAuthenticationFilter")
                             .hasBean("accountIdWebMvcConfig").hasBean("securityErrorHandlingConfig")
@@ -47,13 +47,17 @@ class EnableAnnotationsBeanNamesTest {
                     assertThat(context).hasBean("globalExceptionHandler").hasBean("dataAccessExceptionHandler")
                             .hasBean("customErrorController").hasBean("swaggerConfig").hasBean("timeConfig")
                             // ARC-25: request correlation comes with it
-                            .hasBean("requestCorrelationConfig").hasBean("requestIdFilter");
+                            .hasBean("requestCorrelationConfig").hasBean("requestIdFilter")
+                            // 2.1.0: the legacy assistant header is read as X-Assistant-Id
+                            .hasBean("legacyAssistantHeaderConfig").hasBean("legacyAssistantHeaderFilter");
 
                     // @EnableEncryption
                     assertThat(context).hasBean("rsaService");
 
-                    // Gone on purpose: a service that needs a RestTemplate declares its own; RefGenerator had no user.
-                    assertThat(context).doesNotHaveBean("restTemplate").doesNotHaveBean("refGenerator");
+                    // Gone on purpose: a service that needs a RestTemplate declares its own; RefGenerator had no user;
+                    // the API-key deny-list (2.1.0) had no reader or writer left.
+                    assertThat(context).doesNotHaveBean("restTemplate").doesNotHaveBean("refGenerator")
+                            .doesNotHaveBean("apiKeyRevocationStore");
                 });
     }
 

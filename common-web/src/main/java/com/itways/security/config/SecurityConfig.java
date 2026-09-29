@@ -4,7 +4,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 import com.itways.security.ApiKeyProvider;
-import com.itways.security.ApiKeyRevocationStore;
 import com.itways.security.ApiKeyStatusStore;
 import com.itways.security.SecurityUtils;
 import com.itways.security.SessionRevocationStore;
@@ -26,11 +25,10 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Configuration
-@SuppressWarnings("removal") // ApiKeyRevocationStore stays until its last consumer is gone
-@Import({ SecurityUtils.class, ApiKeyProvider.class, ApiKeyStatusStore.class, ApiKeyRevocationStore.class,
-		SessionRevocationStore.class, JwtTokenProvider.class, InternalServiceToken.class,
-		JwtAuthenticationFilter.class, ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class,
-		SecurityErrorHandlingConfig.class, ClientIpResolver.class, ServiceCallsConfig.class })
+@Import({ SecurityUtils.class, ApiKeyProvider.class, ApiKeyStatusStore.class, SessionRevocationStore.class,
+		JwtTokenProvider.class, InternalServiceToken.class, JwtAuthenticationFilter.class,
+		ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class, SecurityErrorHandlingConfig.class,
+		ClientIpResolver.class, ServiceCallsConfig.class })
 public class SecurityConfig {
 	
 	@PostConstruct

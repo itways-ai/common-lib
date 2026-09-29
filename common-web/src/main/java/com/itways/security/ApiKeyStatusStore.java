@@ -18,8 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Redis-backed ALLOW-list of usable API keys, shared by every service that
- * accepts {@code X-API-KEY}. Replaces the deny-list in
- * {@link ApiKeyRevocationStore} (AS-08).
+ * accepts {@code X-API-KEY}. Replaced the Redis deny-list of revoked keys
+ * (AS-08; the deny-list's store was deleted in 2.1.0, its
+ * {@code nibras:apikeys:revoked:*} entries are no longer read).
  *
  * <p>Why an allow-list: with a deny-list, losing a Redis entry (eviction,
  * restart without persistence, FLUSHALL) silently resurrected a revoked key.
