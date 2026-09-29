@@ -15,6 +15,8 @@ Two things change for a service as soon as it moves, before it adopts any helper
   `X-Request-Id`, and error bodies carry `reference` (section 5). Opt out with
   `itways.request-id.enabled=false`.
 
+Already on 2.0.0? Section 7 lists what 2.1.0 changes.
+
 Order of work for one consumer:
 
 1. the pom (section 2);
@@ -901,6 +903,129 @@ Checklist for each consumer:
       `portal-web`: `npm run api:pull && npm run api:types`. `api:pull` reads the running
       services' `/v3/api-docs` and needs `API_DOCS_TOKEN`. Every `ApiResponse*` schema
       gains the optional `reference` property.
+
+## 7. 2.1.0 (from 2.0.0)
+
+An additive minor release for the brand-neutral naming (ARC-22, ARC-23). Nothing a
+consumer compiles against is removed except a class that had no user left.
+
+### What a consumer does
+
+1. `<parent>` → `platform-parent` **2.1.0**. The BOM then gives `common-*` 2.1.0 and
+   `journey-model` / `journey-engine-sdk` **1.0.19** (`ai-engine-sdk` 1.2.0 and
+   `file-storage-sdk` 2.0.1 are unchanged).
+2. Replace every literal `X-Nibras-Assistant` with `ScopeHeaders.ASSISTANT`: controller
+   `@RequestHeader`s, Feign `@RequestHeader`s, local header constants, OpenAPI
+   descriptions (a constant expression such as `"… the " + ScopeHeaders.ASSISTANT +
+   " header"` is allowed in an annotation), and contract YAML. Outbound calls then send
+   `X-Assistant-Id`.
+3. Delete the secret default of the database password: remove the line
+   `spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:12345}` (Spring Boot binds
+   `SPRING_DATASOURCE_PASSWORD` to `spring.datasource.password` by itself). Do not write
+   `${SPRING_DATASOURCE_PASSWORD}` without a default: Boot's binder leaves an unresolved
+   placeholder in place as text and sends it as the password. Integration tests set
+   their own password (`@DynamicPropertySource` or `@ServiceConnection`) and do not
+   change.
+4. Move explicit `RABBITMQ_*` placeholders to Spring Boot's own names: delete
+   `spring.rabbitmq.*=${RABBITMQ_HOST:…}` (and `_PORT`, `_USERNAME`, `_PASSWORD`) or
+   point them at `SPRING_RABBITMQ_*`. Compose already sets the `SPRING_RABBITMQ_*` names.
+5. A service that hosts the journey engine (conversation-service) renames the engine's
+   keys it sets, see below.
+6. Portal: after the services are redeployed, `npm run api:pull && npm run api:types`;
+   header parameters in the specs are now named `X-Assistant-Id`.
+
+### Changed
+
+- **`ScopeHeaders.ASSISTANT` is `X-Assistant-Id`** (was `X-Nibras-Assistant`). The old
+  name is `ScopeHeaders.LEGACY_ASSISTANT`, deprecated for removal. Source-compatible;
+  every `@RequestHeader(ScopeHeaders.ASSISTANT)` now binds and documents the new name.
+- **The legacy name is still accepted**, so the portal and the services can move in
+  any order:
+  - `LegacyAssistantHeaderFilter` (bean `legacyAssistantHeaderFilter`, `/*`, order
+    `HIGHEST_PRECEDENCE + 1`) comes with `@EnableCommon` and with
+    `@EnableAssistantScope` (registered once when both are on). A request that sends
+    only `X-Nibras-Assistant` reaches the service as if it had sent `X-Assistant-Id`;
+    when both are sent, `X-Assistant-Id` wins and the request is untouched.
+  - `@RequestedScope` reads `X-Assistant-Id`, else the legacy name, with or without
+    the filter.
+  - Each request that used the legacy name logs one DEBUG line
+    (`com.itways.scope.AssistantHeader`).
+  - common-lib itself sends no assistant header.
+- Javadoc and comments name conversation-service (was speech-service /
+  assistant-service) and no product brand.
+
+### Removed
+
+- **`com.itways.security.ApiKeyRevocationStore`** (bean `apiKeyRevocationStore`), the
+  Redis deny-list of revoked API keys, deprecated for removal since the allow-list
+  (`ApiKeyStatusStore`, AS-08) replaced it. No service reads or writes it any more
+  (account-service stopped writing it; a comment there still names it). Its
+  `nibras:apikeys:revoked:*` entries are inert and can be deleted.
+
+### Added
+
+- **`common.diagnostics.DatabaseLoginFailureAnalyzer`** (common-web,
+  `META-INF/spring.factories`, always on): when a start fails because the database
+  refused the login (SQL state `28P01`, `28000`, or PgJDBC's "no password was
+  provided"), the startup report says "Set `SPRING_DATASOURCE_PASSWORD`" when no
+  password is configured, else "Check `SPRING_DATASOURCE_USERNAME` and
+  `SPRING_DATASOURCE_PASSWORD`". Other failures are left to Spring Boot's analyzers.
+
+### journey-engine 1.0.19 (pinned by the BOM)
+
+The engine's settings moved from the legacy product prefix to `journey.*`. The host
+(conversation-service) must rename the keys it sets; unset keys keep their defaults.
+
+| Old key | New key | Default |
+| --- | --- | --- |
+| `nibras.journey.api-call.allowed-hosts` | `journey.api-call.allowed-hosts` | empty (env `JOURNEY_API_ALLOWED_HOSTS` in conversation-service's properties) |
+| `nibras.journey.api-call.block-private-networks` | `journey.api-call.block-private-networks` | `true` |
+| `nibras.journey.api-call.connect-timeout-ms` / `read-timeout-ms` | `journey.api-call.connect-timeout-ms` / `read-timeout-ms` | `5000` / `30000` |
+| `nibras.journey.script.statement-limit` / `timeout-seconds` | `journey.script.statement-limit` / `timeout-seconds` | `500000` / `10` |
+| `nibras.journey.user-input.max-attempts` | `journey.user-input.max-attempts` | `3` |
+| `nibras.journey.data-map.context-budget-chars` | `journey.data-map.context-budget-chars` | `8000` |
+| `nibras.knowledge.synthesis.enabled` / `max-chunks` | `journey.knowledge.synthesis.enabled` / `max-chunks` | `true` / `3` |
+
+A key still set under the old name is ignored after the upgrade: for
+`allowed-hosts` that means private hosts are refused again until the key is renamed
+(fail-safe, not fail-open).
+
+### Unchanged on purpose (data identifiers)
+
+Redis keys `nibras:auth:revoked-session:*`, `nibras:auth:pwchanged:*`,
+`nibras:apikeys:active:*`, `nibras:apikeys:lastused:*`, `nibras:cache:*`; the engine's
+run parameters `__nibras_conversation_id`, `__nibras_channel_capabilities`,
+`__nibras_user_token` (stored in run history; journey-service's V8 migration and
+redaction match the last one). No RabbitMQ name carries the prefix. See README,
+"Names that keep the old product prefix".
+
+### Build order
+
+As in section 6, with `journey-engine` at 1.0.19:
+
+```bash
+mvn -f common-lib/pom.xml install
+mvn -f file-storage-sdk/pom.xml install
+mvn -f ai-engine-sdk/pom.xml install
+mvn -f journey-engine/pom.xml install     # 1.0.19, parent platform-parent 2.1.0
+mvn -f journey-service/pom.xml install    # the stubs for the consumer contract tests
+```
+
+`file-storage-sdk` 2.0.1 and `ai-engine-sdk` 1.2.0 still name `platform-parent`
+2.0.0 as their parent. Maven reads that parent both to build them and to resolve them
+as a dependency, so until they are released on `platform-parent` 2.1.0 (and the BOM
+pins those releases) a clean local repository, and the `libs` stage of
+`docker/java/Dockerfile`, also need `common-lib` 2.0.0 installed (`git worktree add
+<dir> v2.0.0`, then `mvn -f <dir>/pom.xml install -DskipTests`).
+
+Checklist, in addition to section 6's:
+
+- [ ] `git grep -n X-Nibras-Assistant` in the service finds nothing (the literal lives
+      only in `ScopeHeaders.LEGACY_ASSISTANT`).
+- [ ] A request with only `X-Nibras-Assistant` still lists and creates for that
+      assistant; one with `X-Assistant-Id` does too.
+- [ ] `grep -n '12345\|RABBITMQ_HOST' src/main/resources/application.properties` finds
+      nothing; the stack sets `SPRING_DATASOURCE_PASSWORD` for the service.
 
 ## Commits read
 

@@ -4,7 +4,8 @@ The shared Java code of the platform's Spring Boot services, built as one Maven
 reactor of five modules: the parent POM and BOM every service builds with, and the
 shared library split in three jars by what they need at runtime.
 
-Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md).
+Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md); from 2.0.0 to 2.1.0:
+its section 7.
 
 | Module | Coordinates | What it is |
 | --- | --- | --- |
@@ -15,7 +16,7 @@ Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md).
 | `common-messaging` | `com.itways:common-messaging` | The RabbitMQ side: JSON conversion, publisher confirms and returns, the activity and notification publishers with their DTOs, the transactional activity outbox. Depends on `common-core`. |
 
 `common-web` and `common-messaging` do not depend on each other; a service takes the
-ones it needs. All five share one version (`2.0.0`). Java 21, Spring Boot 3.2.x.
+ones it needs. All five share one version (`2.1.0`). Java 21, Spring Boot 3.2.x.
 
 The packages did not move with the split: `com.itways.*` names are the same as in
 `common-lib` 1.x, only the jar that holds them changed. Two packages are spread over
@@ -31,9 +32,8 @@ modules and builds them in order:
 mvn -f common-lib/pom.xml install          # runs the tests; -DskipTests to skip them
 ```
 
-Each service's CI installs it first. The `libs` stage of the workspace's
-`docker/java/Dockerfile` still copies the 1.x `common-lib/src`; it must copy the
-reactor pom and the five module directories instead (MIGRATION-2.0.md, section 6).
+Each service's CI installs it first, and the `libs` stage of the workspace's
+`docker/java/Dockerfile` installs the reactor before the other libraries.
 On a host whose JDK is newer than 21, Lombok fails with "cannot find symbol"; build
 with JDK 21 (or in the `maven:3.9-eclipse-temurin-21` image).
 
@@ -43,7 +43,7 @@ plus the two poms:
 | Artifact | Used by |
 | --- | --- |
 | `common-core-<v>.jar` | every service, and the api-gateway (WebFlux) on its own |
-| `common-web-<v>.jar` | account, auth, channels, journey, notification, speech, template |
+| `common-web-<v>.jar` | account, auth, channels, journey, notification, conversation, template |
 | `common-messaging-<v>.jar` | every service that publishes activity or notifications |
 | `platform-parent-<v>.pom`, `platform-bom-<v>.pom` | every service's `<parent>`; the BOM through it |
 
@@ -80,13 +80,13 @@ bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 
 | Annotation | Module | Imports | What the service gets |
 | --- | --- | --- | --- |
-| `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC), and request correlation (`RequestCorrelationConfig`, the `requestIdFilter`; see "Request correlation"). `ApiResponse` / `PageResponse` are plain classes in common-core. |
+| `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC), request correlation (`RequestCorrelationConfig`, the `requestIdFilter`; see "Request correlation") and, during the header rename, `LegacyAssistantHeaderConfig` (see "Assistant header"). `ApiResponse` / `PageResponse` are plain classes in common-core. |
 | `@EnableRequestCorrelation` | common-web | `web.correlation.RequestCorrelationConfig` | The request-id filter alone, for a servlet service without `@EnableCommon` |
-| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, revocation / API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on) |
+| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, the session-revocation and API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on) |
 | `@EnableInternalEndpointGuard` | common-web | `security.internal.InternalEndpointGuardConfig` | The `/internal/` guard filter (`internalEndpointGuard`, see "Shared helpers"); needs `@EnableCustomSecurity` |
 | `@EnableMailSecrets` | common-web | `encryption.MailSecretsConfig` | The `MailSecrets` bean from `MAIL_SECRETS_KEY`, required unless `itways.mail-secrets.required=false` |
 | `@EnableCache` | common-web | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
-| `@EnableAssistantScope` | common-web | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`; spring-jdbc is optional here) |
+| `@EnableAssistantScope` | common-web | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`; spring-jdbc is optional here), and `LegacyAssistantHeaderConfig` like `@EnableCommon` |
 | `@EnableEncryption` | common-web | `encryption.EncryptionConfig` | `RsaService` (the `EncryptionService`); `ChannelSecrets` and `MailSecrets` are static helpers of that package |
 | `@EnableForwardedAuth` | common-web | `feign.ForwardedAuthFeignConfig` | Feign interceptor that forwards the caller's credential and `X-Service-Token` (needs Feign on the service's classpath; the configuration backs off without it) |
 | `@EnableFreeMarker` | common-web | `freemarker.FreeMarkerConfig` | `TemplateRender` (needs `spring-boot-starter-freemarker` on the service's classpath; backs off without it) |
@@ -109,7 +109,11 @@ is now Spring Boot's.
   `cache.config.CacheAutoConfiguration` (the cache beans, ordered before Spring
   Boot's cache auto-configuration) and `common.config.SwaggerConfig`.
 - common-web, `META-INF/spring.factories`: `security.config.GeneratedUserFilter`
-  leaves out Spring Boot's `UserDetailsServiceAutoConfiguration`, see below.
+  leaves out Spring Boot's `UserDetailsServiceAutoConfiguration`, see below;
+  `common.diagnostics.DatabaseLoginFailureAnalyzer` (2.1.0) turns a start the
+  database refused into "set `SPRING_DATASOURCE_PASSWORD`" (or "check the user
+  name and password" when one is set), since the services ship no default
+  database password.
 - common-messaging, `AutoConfiguration.imports`:
   `messaging.RabbitPublishingAutoConfiguration` logs publisher nacks and returns,
   and carries the request id over RabbitMQ (ARC-25, see "Request correlation").
@@ -134,9 +138,10 @@ is now Spring Boot's.
 | `web.correlation` | web | `RequestIdFilter`, `CurrentRequestId`, `RequestCorrelationConfig`: the request id of the request being served. |
 | `web.net` | web | `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads`: calls to tenant-supplied URLs pinned to vetted public addresses, and size-capped downloads (needs Apache HttpClient 5, optional here). |
 | `security.config`, `security.resolver`, `security.annotation` | web | Security wiring, `@AccountId`. |
-| `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`. |
+| `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`; `LegacyAssistantHeaderFilter` / `LegacyAssistantHeaderConfig` (the old header name, during the rename). |
 | `cache` | web | `CacheStore` / `CacheStoreFactory` with Ehcache, Redis and hybrid stores; `CacheProperties`. |
 | `encryption` | web | `ChannelSecrets` (`CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords), `EncryptionService`, `RsaService`. |
+| `common.diagnostics` | web | `DatabaseLoginFailureAnalyzer`: startup failure analysis for a refused database login. |
 | `common.config`, `common.handler` | web | `CommonConfig`, `SwaggerConfig`, `TimeConfig`, the OpenAPI customizers; the exception handlers (`GlobalExceptionHandler` is an overridable base, see "Shared helpers") and `/error` controller. |
 | `feign`, `freemarker`, `jpa` | web | The opt-in integrations above. |
 | `annotation` | web + messaging | The `@Enable*` annotations; `EnableActivity` and `EnableNotifications` ship in common-messaging, the rest in common-web. |
@@ -166,13 +171,13 @@ one among the copies; where copies legitimately differed there is a knob.
 | Helper | Module, package | How to enable | Replaces |
 | --- | --- | --- | --- |
 | `InternalEndpointGuard` | common-web, `security.internal` | `@EnableInternalEndpointGuard` on the application class (needs `@EnableCustomSecurity`) | account `web/InternalEndpointGuard`, channels / journey / template `config/InternalEndpointGuard` |
-| `Sessions` | common-web, `security.servlet` | Use it: `anyRequest().access(Sessions.userSession())`, `Sessions.isUserSession(auth)`, `Sessions.kindOf(auth)` | account / channels `SecurityConfig.USER_SESSION`, journey `support/Sessions`, template `SecurityConfig.isUserSession`, speech `chat/ChatOwner.isUserSession`, account `ActivityRecorder.currentCredentialKind` |
+| `Sessions` | common-web, `security.servlet` | Use it: `anyRequest().access(Sessions.userSession())`, `Sessions.isUserSession(auth)`, `Sessions.kindOf(auth)` | account / channels `SecurityConfig.USER_SESSION`, journey `support/Sessions`, template `SecurityConfig.isUserSession`, conversation `chat/ChatOwner.isUserSession`, account `ActivityRecorder.currentCredentialKind` |
 | `ClientIp` + `ClientIpResolver` | common-core `common.net` (`IpLiterals`, `TrustedProxies`, `ClientIp`); common-web `security.servlet.ClientIpResolver` | The bean `clientIpResolver` comes with `@EnableCustomSecurity`; `resolve(request)` or `current()` | gateway `net/IpLiterals`, `net/TrustedProxies` (the gateway keeps `ClientAddressFilter` on top of `ClientIp`), account `activity/ClientIpResolver`, auth `audit/ClientRequestInfo` (its IP part) |
 | `GlobalExceptionHandler` (overridable) | common-web, `common.handler` | Already there with `@EnableCommon`; a service with its own codes registers `class XExceptionHandler extends GlobalExceptionHandler` (a scanned `@RestControllerAdvice`) and overrides handlers or hooks; the base backs off | account `web/AccountExceptionHandler`, auth `config/AuthExceptionHandler` (the framework part; their domain handlers stay in the subclass) |
 | `ServiceCalls` | common-web, `web.client` | The bean `serviceCalls` comes with `@EnableCustomSecurity`: `serviceCalls.client(baseUrl)` / `.builder()`; or `.headers(serviceCalls::forwardCaller)` on a client built elsewhere | channels / journey `integrations/ServiceHttp`, account `assistants/ForwardedCaller`, template `integrations/JourneyUsageClient.callerAndServiceHeaders`; the Feign interceptor of `@EnableForwardedAuth` shares its resolution (`CallerCredentials`) |
-| `MailSecretsConfig` | common-web, `encryption` | `@EnableMailSecrets`; consumers inject `MailSecrets` (or `ObjectProvider<MailSecrets>` when optional) | journey / notification `config/MailSecretsConfig`, speech `notification/RabbitMailDeliveryAdapter`'s inline `new MailSecrets(...)` |
+| `MailSecretsConfig` | common-web, `encryption` | `@EnableMailSecrets`; consumers inject `MailSecrets` (or `ObjectProvider<MailSecrets>` when optional) | journey / notification `config/MailSecretsConfig`, conversation `notification/RabbitMailDeliveryAdapter`'s inline `new MailSecrets(...)` |
 | `DeadLetterQueueGauge` | common-messaging, `messaging` | Declare a bean: `new DeadLetterQueueGauge(amqpAdmin, "notification.dlq.messages", "notification.dlq", "...")` (Actuator on the classpath; no `@EnableScheduling` needed) | account `activity/DeadLetterQueueGauge`, notification `messaging/DeadLetterQueueGauge` |
-| `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads` | common-web, `web.net` | Use them; add `org.apache.httpcomponents.client5:httpclient5` to the service (optional here) | speech `net/PinnedHttpClients`, `net/PublicOnlyDnsResolver`, `net/BoundedDownloads` |
+| `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads` | common-web, `web.net` | Use them; add `org.apache.httpcomponents.client5:httpclient5` to the service (optional here) | conversation `net/PinnedHttpClients`, `net/PublicOnlyDnsResolver`, `net/BoundedDownloads` |
 
 The rules, and what changes for an adopter:
 
@@ -194,7 +199,7 @@ The rules, and what changes for an adopter:
   lane) and `headerValue()` (what an outbound call sends). Static
   `isInternalPath(request)` and `cameThroughProxy(request)` are public.
 - **User session.** A session is a user's when it is authenticated, names a
-  principal (speech's check), has a details map, is not an API key
+  principal (conversation's check), has a details map, is not an API key
   (`authSource=API_KEY`), is not a channel webhook token
   (`tokenType=CHANNEL_WEBHOOK`) and, if it names a token type at all, that type
   is `ACCESS` (auth's allow-list: a refresh token or an unknown type is refused).
@@ -237,7 +242,7 @@ The rules, and what changes for an adopter:
 - **Mail secrets.** `mail.secrets.key` (default `${MAIL_SECRETS_KEY:}`) and
   `mail.secrets.previous-key` (default `${MAIL_SECRETS_KEY_PREVIOUS:}`); a
   blank key fails the startup with `MailSecrets`' own message. With
-  `itways.mail-secrets.required=false` a blank key registers no bean (speech's
+  `itways.mail-secrets.required=false` a blank key registers no bean (conversation's
   optional use; a WARN says so). A service's own `MailSecrets` bean wins.
 - **DLQ gauge.** `(AmqpAdmin, metricName, queueName, description)` plus an
   overload with `initialDelay` / `refreshInterval` (10 s / 30 s); its own daemon
@@ -245,12 +250,12 @@ The rules, and what changes for an adopter:
   unknown; tag `queue=<queueName>` (new for the account and notification metrics:
   the series gains a label, the names stay); a failure logs the exception's
   class name only, at DEBUG.
-- **Pinned HTTP.** `PublicOnlyDnsResolver` keeps speech's signatures and refusal
+- **Pinned HTTP.** `PublicOnlyDnsResolver` keeps conversation's signatures and refusal
   (`RefusedAddressException`, an `UnknownHostException`, message without the
   address) and gains an allow-list (exact names or `.domain` suffixes, as
   journey-engine's and notification's guards have) and a `Predicate<InetAddress>`
   for what counts as public (`PublicUrlPolicy::isPublic` by default).
-  `PinnedHttpClients` keeps speech's signatures, defaults (pool 25/5, the
+  `PinnedHttpClients` keeps conversation's signatures, defaults (pool 25/5, the
   `followRedirects` parameter) and adds journey-engine's stricter settings:
   cookies are never kept and waiting for a pooled connection is bounded by the
   connect timeout; an overload takes a `PoolSize`. `BoundedDownloads` is as it
@@ -345,6 +350,45 @@ or no `reference`, needs updating; success bodies are unchanged. Outbox payloads
 of events recorded during a request gain `requestId`; a consumer on an older
 common-lib ignores it (Spring AMQP's JSON converter does not fail on unknown
 properties). The OpenAPI schema of the envelope gains the optional `reference`.
+
+## Assistant header (2.1.0)
+
+The console's selected assistant travels in `X-Assistant-Id`
+(`ScopeHeaders.ASSISTANT`). Its name before 2.1.0, `X-Nibras-Assistant`
+(`ScopeHeaders.LEGACY_ASSISTANT`, deprecated for removal), is still accepted while
+the portal and the services move over:
+
+- `LegacyAssistantHeaderFilter` (filter `legacyAssistantHeaderFilter`, `/*`, order
+  `HIGHEST_PRECEDENCE + 1`, after the request id and before the internal guard and
+  Spring Security) hands a request that sends only the legacy name to the service
+  as if it had sent `X-Assistant-Id` with the same value. A controller parameter
+  `@RequestHeader(ScopeHeaders.ASSISTANT)` therefore accepts both names. It comes
+  with `@EnableCommon` and with `@EnableAssistantScope` (once when both are on).
+- `@RequestedScope` reads `X-Assistant-Id`, else the legacy name, even without the
+  filter. When both are sent, `X-Assistant-Id` wins.
+- A request that used the legacy name is logged at DEBUG
+  (`com.itways.scope.AssistantHeader`), so the last callers can be found.
+- Nothing in common-lib sends the header; a service's own outbound calls use
+  `ScopeHeaders.ASSISTANT`.
+
+Removal: once no caller sends the legacy name, delete `LEGACY_ASSISTANT`,
+`LegacyAssistantHeaderFilter` and `LegacyAssistantHeaderConfig` in a major release.
+
+### Names that keep the old product prefix
+
+Data identifiers are not renamed with the code: a rename would sign every user out
+or orphan stored entries. These Redis keys keep their `nibras:` prefix until the
+product name is settled (BRD-03):
+
+| Key | Written by | Read by |
+| --- | --- | --- |
+| `nibras:auth:revoked-session:<sid>`, `nibras:auth:pwchanged:<accountId>` | auth-service (`SessionRevocationStore`) | every service's `JwtAuthenticationFilter` |
+| `nibras:apikeys:active:<keyHash>`, `nibras:apikeys:lastused:<keyHash>` | account-service (`ApiKeyStatusStore`) | every service's `ApiKeyAuthenticationFilter` |
+| `nibras:cache:<cacheName>:<key>` | `RedisStore` (the Redis and hybrid caches) | the same |
+
+`nibras:apikeys:revoked:*` (the deny-list before AS-08) is no longer read or written
+since 2.1.0; leftover entries are inert and can be deleted (some have no TTL). No RabbitMQ exchange or
+queue declared here carries the prefix.
 
 ## Security defaults
 
@@ -546,7 +590,9 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   MockMvc), `ErrorEnvelopeReferenceTest` (every error writer, with and without an
   id), `ApiResponseJsonTest`,
   `PinnedHttpClientsTest`, `BoundedDownloadsTest`, `DnsRebindingTest` (needs
-  `127.0.0.2` on the loopback interface, as on Linux; skipped elsewhere).
+  `127.0.0.2` on the loopback interface, as on Linux; skipped elsewhere);
+  2.1.0: `RequestedScopeArgumentResolverTest` and `LegacyAssistantHeaderFilterTest`
+  (both header names, precedence, registration), `DatabaseLoginFailureAnalyzerTest`.
 - common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
   `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
   health and gauges, and that it stays off without the property);
@@ -561,14 +607,14 @@ once, a broker outage keeps the rows and sends them after recovery, two relays n
 send one row twice, sent rows go after the retention, and the request id recorded
 with an event arrives as its `x-request-id` header.
 
-Test counts at 2.0.0 (`mvn verify`):
+Test counts at 2.1.0 (`mvn verify`):
 
 | Module | Unit tests (surefire) | Integration tests (failsafe) |
 | --- | --- | --- |
 | common-core | 60 | none |
-| common-web | 204, of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
+| common-web | 223, of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
 | common-messaging | 58 | 10 (`ActivityOutboxIT`) |
 
-332 in all.
+351 in all (332 at 2.0.0).
 
 A change here is verified against every consumer's own suite before it ships.
