@@ -911,9 +911,10 @@ consumer compiles against is removed except a class that had no user left.
 
 ### What a consumer does
 
-1. `<parent>` → `platform-parent` **2.1.0**. The BOM then gives `common-*` 2.1.0 and
-   `journey-model` / `journey-engine-sdk` **1.0.19** (`ai-engine-sdk` 1.2.0 and
-   `file-storage-sdk` 2.0.1 are unchanged).
+1. `<parent>` → `platform-parent` **2.1.0**. The BOM then gives `common-*` 2.1.0,
+   `journey-model` / `journey-engine-sdk` **1.0.19**, `file-storage-sdk` **2.0.2** and
+   `ai-engine-sdk` **1.2.1** (patch releases of 2.0.1 / 1.2.0 whose only change is the
+   parent `platform-parent` 2.1.0; same code and dependencies).
 2. Replace every literal `X-Nibras-Assistant` with `ScopeHeaders.ASSISTANT`: controller
    `@RequestHeader`s, Feign `@RequestHeader`s, local header constants, OpenAPI
    descriptions (a constant expression such as `"… the " + ScopeHeaders.ASSISTANT +
@@ -1011,12 +1012,13 @@ mvn -f journey-engine/pom.xml install     # 1.0.19, parent platform-parent 2.1.0
 mvn -f journey-service/pom.xml install    # the stubs for the consumer contract tests
 ```
 
-`file-storage-sdk` 2.0.1 and `ai-engine-sdk` 1.2.0 still name `platform-parent`
-2.0.0 as their parent. Maven reads that parent both to build them and to resolve them
-as a dependency, so until they are released on `platform-parent` 2.1.0 (and the BOM
-pins those releases) a clean local repository, and the `libs` stage of
-`docker/java/Dockerfile`, also need `common-lib` 2.0.0 installed (`git worktree add
-<dir> v2.0.0`, then `mvn -f <dir>/pom.xml install -DskipTests`).
+`file-storage-sdk` 2.0.2 and `ai-engine-sdk` 1.2.1 name `platform-parent` 2.1.0 as
+their parent, so a clean local repository (and the `libs` stage of
+`docker/java/Dockerfile`) needs only this `common-lib` installed. Their previous
+releases, 2.0.1 and 1.2.0, name `platform-parent` 2.0.0: Maven reads that parent both
+to build them and to resolve them as a dependency, so a consumer still on
+`platform-parent` 2.0.0 (whose BOM pins them) also needs `common-lib` 2.0.0 installed (`git worktree add <dir> v2.0.0`, then
+`mvn -f <dir>/pom.xml install -DskipTests`).
 
 Checklist, in addition to section 6's:
 
