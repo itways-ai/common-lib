@@ -37,6 +37,8 @@ class EnableAnnotationsBeanNamesTest {
                             .hasBean("apiResponseAuthenticationEntryPoint").hasBean("apiResponseAccessDeniedHandler")
                             // ARC-11: the client-IP resolver and the service-call builder come with it
                             .hasBean("clientIpResolver").hasBean("serviceCallsConfig").hasBean("serviceCalls");
+                    // 2.2.0: the service-token filter only with itways.internal-token (see below)
+                    assertThat(context).doesNotHaveBean("serviceTokenAuthenticationFilter");
 
                     // @EnableCache, through @EnableCustomSecurity
                     assertThat(context).hasBean("cacheConfig").hasBean("cacheProviderConfig")
@@ -57,6 +59,19 @@ class EnableAnnotationsBeanNamesTest {
                     // the API-key deny-list (2.1.0) had no reader or writer left.
                     assertThat(context).doesNotHaveBean("restTemplate").doesNotHaveBean("refGenerator")
                             .doesNotHaveBean("apiKeyRevocationStore");
+                });
+    }
+
+    @Test
+    void withTheServiceTokenSetTheServiceTokenFilterComesWithCustomSecurity() {
+        new WebApplicationContextRunner().withUserConfiguration(App.class)
+                .withPropertyValues("jwt.encryption.key=test-only-key", "jwt.rsa.public-key=" + publicKey(),
+                        "itways.internal-token=svc-token")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasBean("serviceTokenAuthenticationConfig")
+                            .hasBean("serviceTokenAuthenticationFilter")
+                            .hasBean("serviceTokenAuthenticationFilterRegistration");
                 });
     }
 

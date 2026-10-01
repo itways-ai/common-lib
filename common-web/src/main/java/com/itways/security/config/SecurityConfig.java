@@ -5,6 +5,7 @@ import com.itways.security.ApiKeyStatusStore;
 import com.itways.security.SecurityUtils;
 import com.itways.security.SessionRevocationStore;
 import com.itways.security.internal.InternalServiceToken;
+import com.itways.security.internal.ServiceTokenAuthenticationConfig;
 import com.itways.security.jwt.JwtTokenProvider;
 import com.itways.security.servlet.ApiKeyAuthenticationFilter;
 import com.itways.security.servlet.ClientIpResolver;
@@ -20,13 +21,16 @@ import org.springframework.context.annotation.Import;
  * component-scan {@code com.itways.security}); the bean names are the ones the
  * scan gave. {@link ClientIpResolver} and {@link ServiceCallsConfig} (ARC-11)
  * are plain helpers with no side effects: a bean each, nothing switched on.
+ * {@link ServiceTokenAuthenticationConfig} (2.2.0) likewise only offers the
+ * service-token filter, when {@code itways.internal-token} is set, for a
+ * service's chain to add.
  */
 @Slf4j
 @Configuration
 @Import({ SecurityUtils.class, ApiKeyProvider.class, ApiKeyStatusStore.class, SessionRevocationStore.class,
         JwtTokenProvider.class, InternalServiceToken.class, JwtAuthenticationFilter.class,
         ApiKeyAuthenticationFilter.class, AccountIdWebMvcConfig.class, SecurityErrorHandlingConfig.class,
-        ClientIpResolver.class, ServiceCallsConfig.class })
+        ClientIpResolver.class, ServiceCallsConfig.class, ServiceTokenAuthenticationConfig.class })
 public class SecurityConfig {
 
     @PostConstruct

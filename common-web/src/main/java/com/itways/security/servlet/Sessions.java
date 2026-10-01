@@ -35,6 +35,15 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
  * other five services and many of their test fixtures build one that way, and
  * the filter itself never omits it. A blank principal name is refused, as
  * conversation-service did.
+ *
+ * <p>
+ * A <em>service call</em> (2.2.0) is another platform service calling with the
+ * shared service token and no tenant credential, as a background worker does
+ * ({@code ServiceTokenAuthenticationFilter}: authority {@value #AUTHORITY_SERVICE},
+ * {@value #DETAIL_AUTH_SOURCE} = {@value #AUTH_SOURCE_SERVICE_TOKEN}, no account).
+ * It is none of the credential kinds ({@link #kindOf} says {@link CredentialKind#NONE},
+ * so {@link #userSession()} refuses it) and is admitted only where a chain says
+ * {@link #serviceCall()}. Note that {@code authenticated()} admits it too.
  */
 public final class Sessions {
 
@@ -42,7 +51,10 @@ public final class Sessions {
     public static final String DETAIL_ACCOUNT_ID = "accountId";
     /** Details key: the JWT's {@code type} claim, {@code ACCESS} when absent (JWT filter only). */
     public static final String DETAIL_TOKEN_TYPE = "tokenType";
-    /** Details key: how the caller authenticated; only {@value #AUTH_SOURCE_API_KEY} is written today. */
+    /**
+     * Details key: how the caller authenticated; {@value #AUTH_SOURCE_API_KEY} or (2.2.0)
+     * {@value #AUTH_SOURCE_SERVICE_TOKEN}, absent on a bearer session.
+     */
     public static final String DETAIL_AUTH_SOURCE = "authSource";
     /** {@value #DETAIL_AUTH_SOURCE} value of an API-key session. */
     public static final String AUTH_SOURCE_API_KEY = "API_KEY";
@@ -50,6 +62,12 @@ public final class Sessions {
     public static final String DETAIL_KEY_VERSION = "keyVersion";
     /** Details key: the socket address the request came from (JWT filter only). */
     public static final String DETAIL_REMOTE_ADDRESS = "remoteAddress";
+    /** {@value #DETAIL_AUTH_SOURCE} value of a service call (2.2.0, service-token filter). */
+    public static final String AUTH_SOURCE_SERVICE_TOKEN = "SERVICE_TOKEN";
+    /** The authority of a service call (2.2.0): {@code hasAuthority("SERVICE")}. */
+    public static final String AUTHORITY_SERVICE = "SERVICE";
+    /** The principal name of a service call (2.2.0). */
+    public static final String SERVICE_PRINCIPAL = "platform-service";
 
     /** The kinds of credential a session is built from. */
     public enum CredentialKind {
@@ -59,7 +77,10 @@ public final class Sessions {
         API_KEY,
         /** A channel's webhook token, embedded in a provider's webhook URL. */
         CHANNEL_WEBHOOK,
-        /** Anonymous, or a session this class does not recognise as any of the above. */
+        /**
+         * Anonymous, a service call ({@link Sessions#isServiceCall}), or a session this class
+         * does not recognise as any of the above.
+         */
         NONE
     }
 
@@ -73,6 +94,10 @@ public final class Sessions {
         }
         if (AUTH_SOURCE_API_KEY.equals(details.get(DETAIL_AUTH_SOURCE))) {
             return CredentialKind.API_KEY;
+        }
+        if (AUTH_SOURCE_SERVICE_TOKEN.equals(details.get(DETAIL_AUTH_SOURCE))) {
+            // A platform service, not a person, a key or a webhook: see isServiceCall.
+            return CredentialKind.NONE;
         }
         Object tokenType = details.get(DETAIL_TOKEN_TYPE);
         if (TokenVerifier.TYPE_CHANNEL_WEBHOOK.equals(tokenType)) {
@@ -96,5 +121,27 @@ public final class Sessions {
     /** For a chain: {@code anyRequest().access(Sessions.userSession())}. */
     public static AuthorizationManager<RequestAuthorizationContext> userSession() {
         return (authentication, context) -> new AuthorizationDecision(isUserSession(authentication.get()));
+    }
+
+    /**
+     * True for a service call (2.2.0): authenticated, {@value #DETAIL_AUTH_SOURCE} =
+     * {@value #AUTH_SOURCE_SERVICE_TOKEN} and the {@value #AUTHORITY_SERVICE} authority, as
+     * {@code ServiceTokenAuthenticationFilter} sets them. False for everything else, a user's
+     * session that also carried the token included (the user wins there).
+     */
+    public static boolean isServiceCall(Authentication auth) {
+        return auth != null && auth.isAuthenticated() && auth.getDetails() instanceof Map<?, ?> details
+                && AUTH_SOURCE_SERVICE_TOKEN.equals(details.get(DETAIL_AUTH_SOURCE))
+                && auth.getAuthorities().stream().anyMatch(a -> AUTHORITY_SERVICE.equals(a.getAuthority()));
+    }
+
+    /**
+     * For a chain (2.2.0): routes only another platform service may call, e.g.
+     * {@code requestMatchers(".../ingestion/**").access(Sessions.serviceCall())}. Needs the
+     * service to put {@code ServiceTokenAuthenticationFilter} in its chain; without it (or
+     * without {@code itways.internal-token}) nothing is admitted.
+     */
+    public static AuthorizationManager<RequestAuthorizationContext> serviceCall() {
+        return (authentication, context) -> new AuthorizationDecision(isServiceCall(authentication.get()));
     }
 }

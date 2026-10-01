@@ -2,6 +2,7 @@ package com.itways.security.servlet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.itways.security.internal.ServiceTokenAuthenticationFilter;
 import com.itways.security.servlet.Sessions.CredentialKind;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
@@ -136,6 +138,50 @@ class SessionsTest {
     }
 
     @Test
+    void aServiceCallIsNoneOfTheCredentialKinds() {
+        Authentication service = ServiceTokenAuthenticationFilter.serviceAuthentication();
+
+        assertThat(Sessions.kindOf(service)).isEqualTo(CredentialKind.NONE);
+        assertThat(Sessions.isUserSession(service)).isFalse();
+        assertThat(Sessions.isServiceCall(service)).isTrue();
+    }
+
+    @Test
+    void aServiceCallNeedsTheSourceAndTheAuthority() {
+        // The details alone (no SERVICE authority) are not enough, nor is the authority alone.
+        Authentication sourceOnly = session("platform-service",
+                Map.of(Sessions.DETAIL_AUTH_SOURCE, Sessions.AUTH_SOURCE_SERVICE_TOKEN));
+        assertThat(Sessions.isServiceCall(sourceOnly)).isFalse();
+        // ... and such a session is still no user.
+        assertThat(Sessions.isUserSession(sourceOnly)).isFalse();
+
+        UsernamePasswordAuthenticationToken authorityOnly = new UsernamePasswordAuthenticationToken("platform-service",
+                null, AuthorityUtils.createAuthorityList(Sessions.AUTHORITY_SERVICE));
+        authorityOnly.setDetails(user("ACCESS"));
+        assertThat(Sessions.isServiceCall(authorityOnly)).isFalse();
+
+        assertThat(Sessions.isServiceCall(null)).isFalse();
+        assertThat(Sessions.isServiceCall(session("u", user("ACCESS")))).isFalse();
+        assertThat(Sessions.isServiceCall(session("u", API_KEY))).isFalse();
+        UsernamePasswordAuthenticationToken unauthenticated = new UsernamePasswordAuthenticationToken(
+                "platform-service", null);
+        unauthenticated.setDetails(Map.of(Sessions.DETAIL_AUTH_SOURCE, Sessions.AUTH_SOURCE_SERVICE_TOKEN));
+        assertThat(Sessions.isServiceCall(unauthenticated)).isFalse();
+    }
+
+    @Test
+    void theServiceCallManagerGrantsServiceCallsOnly() {
+        RequestAuthorizationContext context = new RequestAuthorizationContext(new MockHttpServletRequest());
+
+        assertThat(Sessions.serviceCall().check(ServiceTokenAuthenticationFilter::serviceAuthentication, context)
+                .isGranted()).isTrue();
+        assertThat(Sessions.serviceCall().check(() -> session("u", user("ACCESS")), context).isGranted()).isFalse();
+        assertThat(Sessions.serviceCall().check(() -> session("u", API_KEY), context).isGranted()).isFalse();
+        assertThat(Sessions.serviceCall().check(() -> session("u", WEBHOOK), context).isGranted()).isFalse();
+        assertThat(Sessions.serviceCall().check(() -> null, context).isGranted()).isFalse();
+    }
+
+    @Test
     void theDetailKeysAreTheFiltersOwn() {
         // The literal strings the filters wrote before the constants existed, and services test against.
         assertThat(Sessions.DETAIL_ACCOUNT_ID).isEqualTo("accountId");
@@ -144,5 +190,8 @@ class SessionsTest {
         assertThat(Sessions.AUTH_SOURCE_API_KEY).isEqualTo("API_KEY");
         assertThat(Sessions.DETAIL_KEY_VERSION).isEqualTo("keyVersion");
         assertThat(Sessions.DETAIL_REMOTE_ADDRESS).isEqualTo("remoteAddress");
+        // 2.2.0
+        assertThat(Sessions.AUTH_SOURCE_SERVICE_TOKEN).isEqualTo("SERVICE_TOKEN");
+        assertThat(Sessions.AUTHORITY_SERVICE).isEqualTo("SERVICE");
     }
 }
