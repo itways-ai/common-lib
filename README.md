@@ -5,7 +5,7 @@ reactor of five modules: the parent POM and BOM every service builds with, and t
 shared library split in three jars by what they need at runtime.
 
 Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md); from 2.0.0 to 2.1.0:
-its section 7.
+its section 7; from 2.1.0 to 2.2.0: its section 8.
 
 | Module | Coordinates | What it is |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ its section 7.
 | `common-messaging` | `com.itways:common-messaging` | The RabbitMQ side: JSON conversion, publisher confirms and returns, the activity and notification publishers with their DTOs, the transactional activity outbox. Depends on `common-core`. |
 
 `common-web` and `common-messaging` do not depend on each other; a service takes the
-ones it needs. All five share one version (`2.1.0`). Java 21, Spring Boot 3.2.x.
+ones it needs. All five share one version (`2.2.0`). Java 21, Spring Boot 3.2.x.
 
 The packages did not move with the split: `com.itways.*` names are the same as in
 `common-lib` 1.x, only the jar that holds them changed. Two packages are spread over
@@ -86,7 +86,7 @@ bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 | --- | --- | --- | --- |
 | `@EnableCommon` | common-web | `common.config.CommonConfig` | `GlobalExceptionHandler`, `DataAccessExceptionHandler`, `CustomErrorController`, `SwaggerConfig` (OpenAPI schema helpers), `TimeConfig` (UTC), request correlation (`RequestCorrelationConfig`, the `requestIdFilter`; see "Request correlation") and, during the header rename, `LegacyAssistantHeaderConfig` (see "Assistant header"). `ApiResponse` / `PageResponse` are plain classes in common-core. |
 | `@EnableRequestCorrelation` | common-web | `web.correlation.RequestCorrelationConfig` | The request-id filter alone, for a servlet service without `@EnableCommon` |
-| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, the session-revocation and API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on) |
+| `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, the session-revocation and API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on); with `itways.internal-token` set, `ServiceTokenAuthenticationFilter` (2.2.0; a bean for the service's chain to add, never run by the container on its own, see "Service calls") |
 | `@EnableInternalEndpointGuard` | common-web | `security.internal.InternalEndpointGuardConfig` | The `/internal/` guard filter (`internalEndpointGuard`, see "Shared helpers"); needs `@EnableCustomSecurity` |
 | `@EnableMailSecrets` | common-web | `encryption.MailSecretsConfig` | The `MailSecrets` bean from `MAIL_SECRETS_KEY`, required unless `itways.mail-secrets.required=false` |
 | `@EnableCache` | common-web | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
@@ -131,13 +131,14 @@ is now Spring Boot's.
 | Package | Module | What it holds |
 | --- | --- | --- |
 | `security.core` | core | Framework-free credential rules: `TokenVerifier` (JWT, platform and channel-webhook keys, rotation), `ApiKeyCodec` (`X-API-KEY` format), `CredentialCrypto` (AES-256-GCM, SHA-256), `PublicKeys`, `SecurityMessages`. |
-| `contracts` | core | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). Their `@Schema` descriptions feed the portal's OpenAPI specs; the annotation library is optional. |
+| `contracts` | core | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). Their `@Schema` descriptions feed the portal's OpenAPI specs; the annotation library is optional. `knowledge` also holds `KnowledgeIndexName`, the index-name rule (2.2.0). |
+| `common.text` | core | `PiiScrubber` (e-mail addresses and phone numbers out of stored text) and `PassageHashes` (the knowledge passage and source hashes, equal to journey-service's SQL) (2.2.0). |
 | `common.response`, `common.constants`, `common.exception` | core | Envelope (`ApiResponse`, `PageResponse`), error codes, `BusinessException`, `InvalidApiKeyException`. |
 | `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). `IpLiterals`, `TrustedProxies` and `ClientIp`: the client-IP rule behind our proxies (the gateway's, shared). |
 | `common.util` | core | `UtcDateTimes`. |
 | `common.correlation` | core | `RequestIds`: the request-id rule (names, well-formedness, accept or generate) the gateway and the services share. |
 | `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`; `Sessions` (the USER_SESSION rule and the details keys) and `ClientIpResolver` (the servlet side of `ClientIp`). |
-| `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). `InternalEndpointGuard` / `InternalEndpointGuardConfig`: the filter that keeps those routes off the public edge (`@EnableInternalEndpointGuard`). |
+| `security.internal` | web | `InternalServiceToken`: recognises another platform service on `/internal/` routes (`X-Service-Token`, `itways.internal-token`). `InternalEndpointGuard` / `InternalEndpointGuardConfig`: the filter that keeps those routes off the public edge (`@EnableInternalEndpointGuard`). `ServiceTokenAuthenticationFilter` / `ServiceTokenAuthenticationConfig` (2.2.0): a session for a service call that carries only the token. |
 | `web.client` | web | `ServiceCalls`, `ForwardedCallerInterceptor`, `CallerCredentials`: `RestClient`s to other platform services that carry the service token and the caller's credential. |
 | `web.correlation` | web | `RequestIdFilter`, `CurrentRequestId`, `RequestCorrelationConfig`: the request id of the request being served. |
 | `web.net` | web | `PinnedHttpClients`, `PublicOnlyDnsResolver`, `BoundedDownloads`: calls to tenant-supplied URLs pinned to vetted public addresses, and size-capped downloads (needs Apache HttpClient 5, optional here). |
@@ -264,6 +265,32 @@ The rules, and what changes for an adopter:
   cookies are never kept and waiting for a pooled connection is bounded by the
   connect timeout; an overload takes a `PoolSize`. `BoundedDownloads` is as it
   was.
+
+## Service calls (2.2.0)
+
+A background job (conversation-service's knowledge ingestion worker) has no user's
+token to forward. `ServiceTokenAuthenticationFilter` gives a call that carries the
+platform's service token and nothing else a session of its own, and
+`Sessions.serviceCall()` admits it where a chain says so:
+
+- **Who gets it.** `X-Service-Token` equal to `itways.internal-token`
+  (`InternalServiceToken.matches`: trimmed, constant-time), no `Authorization` and no
+  `X-API-KEY` header, and no session set before. The session: principal
+  `platform-service`, authority `SERVICE`, details `{authSource: SERVICE_TOKEN}`, no
+  account. The Feign interceptor sends the token on every call, so a call made for a
+  user carries both and stays the user's; with an invalid user token it stays
+  unauthenticated (401), never a service call. A wrong token is logged (method and path,
+  never the value) and the request goes on unauthenticated; the filter answers nothing.
+- **Rules.** `Sessions.isServiceCall(auth)` / `serviceCall()`. `kindOf` says `NONE` for a
+  service call, so `userSession()` refuses it; `authenticated()` admits it (and
+  `@AccountId` is `null` for it), so put service-only rules before broader ones.
+- **Wiring.** With `@EnableCustomSecurity` and a non-blank `itways.internal-token`, the
+  bean `serviceTokenAuthenticationFilter` exists; its `FilterRegistrationBean` is
+  disabled, so it runs only in a chain that adds it, after the JWT and API-key filters:
+  `serviceTokenFilter.ifAvailable(f -> http.addFilterBefore(f, UsernamePasswordAuthenticationFilter.class))`
+  written after their two `addFilterBefore` lines (inject
+  `ObjectProvider<ServiceTokenAuthenticationFilter>`). `ServiceTokenAuthenticationFilter.serviceAuthentication()`
+  builds the session for a service's security tests.
 
 ## Request correlation (ARC-25)
 
@@ -545,7 +572,7 @@ status or readiness.
 | `itways.security.default-user.enabled` | `false` | `true` keeps Boot's generated in-memory user. |
 | `security.session-revocation.ttl` | `2d` | How long an account cut-off (`nibras:auth:pwchanged:*`) is kept; also the fallback TTL of a revoked session. Must exceed the access-token lifetime. |
 | `jwt.encryption.key` (`JWT_ENCRYPTION_KEY`) | none, required | AES key for tenant binding and API keys (`SecurityUtils`). |
-| `itways.internal-token`, `itways.internal-token-enforce` | none, `false` | `X-Service-Token` for internal routes. |
+| `itways.internal-token`, `itways.internal-token-enforce` | none, `false` | `X-Service-Token` for internal routes. A non-blank token also registers `serviceTokenAuthenticationFilter` (2.2.0). |
 | `itways.internal-guard.enabled` | `true` | With `@EnableInternalEndpointGuard`: `false` registers no filter. |
 | `itways.internal-guard.proxy-headers` | `X-Forwarded-For,X-Forwarded-Host,Forwarded` | The headers whose presence marks a proxied request (at least one). |
 | `itways.client-ip.trusted-proxies` | `${TRUSTED_PROXIES:127.0.0.0/8,::1/128,172.16.0.0/12}` | The proxies allowed to say who the client is (`ClientIpResolver`); IP literals and CIDR ranges only. |
@@ -575,7 +602,12 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
 - common-core: `CommonCoreIsFrameworkFreeTest` (every class of the module against
   the allowed references; `security.core` against the stricter rule);
   `TokenVerifierTest`, `ApiKeyCodecTest`, `CredentialCryptoTest`, `PublicUrlPolicyTest`,
-  `TrustedProxiesTest`, `ClientIpTest`, `RequestIdsTest`.
+  `TrustedProxiesTest`, `ClientIpTest`, `RequestIdsTest`; 2.2.0: `KnowledgeIndexNameTest`
+  (the name rule table, normalising, case twins, legacy and storable names, slugs),
+  `PiiScrubberTest` (e-mail addresses, phone numbers in ASCII, Arabic-Indic and Eastern
+  Arabic-Indic digits, `+`/`00` forms, numbers in Arabic text, what is kept),
+  `PassageHashesTest` (values computed by PostgreSQL 16 with the V14 formula),
+  `KnowledgeContractsCompatibilityTest` (the 2.1.0 constructors and the new helpers).
 - common-web: `SecurityCoreDelegationTest` (the Spring classes delegate to the
   credential rules); `JwtAuthenticationFilterTest` (who gets a session, who gets
   401, who continues unauthenticated); `AccessTokenRevocationTest` (the filter with
@@ -598,7 +630,13 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   `PinnedHttpClientsTest`, `BoundedDownloadsTest`, `DnsRebindingTest` (needs
   `127.0.0.2` on the loopback interface, as on Linux; skipped elsewhere);
   2.1.0: `RequestedScopeArgumentResolverTest` and `LegacyAssistantHeaderFilterTest`
-  (both header names, precedence, registration), `DatabaseLoginFailureAnalyzerTest`.
+  (both header names, precedence, registration), `DatabaseLoginFailureAnalyzerTest`;
+  2.2.0: `ServiceTokenAuthenticationFilterTest` (valid, trimmed, missing, wrong, a
+  tenant credential beside the token, an existing session, and a timing check that a
+  one-character guess costs as much as a nearly right one on a 1 MB token),
+  `ServiceTokenAuthenticationConfigTest` (bean only with a non-blank token, disabled
+  registration), `SessionsTest` (service calls), `KnowledgeContractsJsonTest` (2.1.0
+  payloads into the new records and back, the `KnowledgeSource` aliases, round trips).
 - common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
   `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
   health and gauges, and that it stays off without the property);
@@ -613,14 +651,14 @@ once, a broker outage keeps the rows and sends them after recovery, two relays n
 send one row twice, sent rows go after the retention, and the request id recorded
 with an event arrives as its `x-request-id` header.
 
-Test counts at 2.1.0 (`mvn verify`):
+Test counts at 2.2.0 (`mvn install -DskipITs`; the ITs are unchanged since 2.1.0):
 
 | Module | Unit tests (surefire) | Integration tests (failsafe) |
 | --- | --- | --- |
-| common-core | 60 | none |
-| common-web | 223, of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
+| common-core | 179 (60 at 2.1.0) | none |
+| common-web | 248 (223 at 2.1.0), of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
 | common-messaging | 58 | 10 (`ActivityOutboxIT`) |
 
-351 in all (332 at 2.0.0).
+495 in all (351 at 2.1.0, 332 at 2.0.0).
 
 A change here is verified against every consumer's own suite before it ships.

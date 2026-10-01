@@ -15,7 +15,7 @@ Two things change for a service as soon as it moves, before it adopts any helper
   `X-Request-Id`, and error bodies carry `reference` (section 5). Opt out with
   `itways.request-id.enabled=false`.
 
-Already on 2.0.0? Section 7 lists what 2.1.0 changes.
+Already on 2.0.0? Section 7 lists what 2.1.0 changes; on 2.1.0, section 8 lists 2.2.0.
 
 Order of work for one consumer:
 
@@ -1030,6 +1030,135 @@ Checklist, in addition to section 6's:
       assistant; one with `X-Assistant-Id` does too.
 - [ ] `grep -n '12345\|RABBITMQ_HOST' src/main/resources/application.properties` finds
       nothing; the stack sets `SPRING_DATASOURCE_PASSWORD` for the service.
+
+## 8. 2.2.0 (from 2.1.0)
+
+An additive minor release for the knowledge-base upgrade (work package L1 of its plan).
+Nothing a consumer compiles against is removed or changed: every 2.1.0 public
+constructor, accessor and constant of `common-core` is still there (checked with
+`javap` against the 2.1.0 classes), and a record that gained fields keeps its 2.1.0
+constructor with the old meaning.
+
+### What a consumer does
+
+1. `<parent>` → `platform-parent` **2.2.0**. The BOM then gives `common-*` 2.2.0,
+   `ai-engine-sdk` **1.3.0** and `journey-model` / `journey-engine-sdk` **1.0.20**
+   (`file-storage-sdk` 2.0.2 is unchanged). Those three are released by their own
+   work packages (L2, L3) after this one: see "Build order" below.
+2. Nothing else is required. A service that serves or calls the knowledge base adopts
+   the new contracts and helpers in its own work package.
+3. A service that has routes only another platform service may call (journey-service's
+   `/ingestion/**`) adds the service-token filter to its chain, see below.
+
+### Added (common-core)
+
+- `common.text.PiiScrubber`: `scrub(text)` replaces e-mail addresses with `[email]`
+  and phone numbers with `[phone]` (ASCII, Arabic-Indic U+0660..0669 and Eastern
+  Arabic-Indic U+06F0..06F9 digits; `+`/`00` international and local forms; 7..15
+  digits; dates, years, prices and references glued to Latin letters are kept);
+  `containsPii(text)`.
+- `common.text.PassageHashes`: `sha256Hex(question, answer, locale)` is
+  journey-service's V14 SQL formula byte for byte (`btrim` of spaces only, `"\n"`
+  separators, null answer and locale as `""`; case and inner whitespace count);
+  `sourceHash(hashes)` hashes the sorted passage hashes.
+- `contracts.knowledge.KnowledgeIndexName`: the index-name rule (D6).
+  `normalize` (strip + lower-case), `isValid` (`REGEX`
+  `^[a-z0-9]+(?:[-_][a-z0-9]+)*$`, `MIN_LENGTH` 2, `MAX_LENGTH` 64), `isLegacy`,
+  `isStorable` (not blank, no comma, ≤ 64: what an assistant may reference, legacy
+  names included), `sameName` (case-insensitive), `slug(preview)` (`My FAQ ?` →
+  `my-faq`; `""` when nothing valid can be built), `RULE` (the sentence for a 400).
+  Create: `isValid(normalize(name))`, then a case-insensitive clash check.
+- New records in `contracts.knowledge` (all `@JsonIgnoreProperties(ignoreUnknown = true)`):
+  `KnowledgeSourceView` (with `KIND_*` / `STATUS_*` constants and `withUploadNotes`),
+  `CreateSourceRequest` (+ `website(url)`), `SourcePassage` (+ `of(...)`, which computes
+  the hash), `SourceDiff`, `ClaimRequest`, `SourcePatch` (+ `heartbeat`, `ready`,
+  `failed`), `PendingPassage`, `CreateIndexRequest`, `RowsBulkRequest` (`ACTION_*`),
+  `RowsBulkResult`, `KnowledgeSearchExplanation` (+ `withEmbeddingMs`), `KnowledgeHit`
+  (`REASON_*`; `matchedTerms`, `termCoverage`, with a constructor without them), `KnowledgeHitDrop`
+  (the same two, likewise), `GapApproveRequest` (+ `withVector`), `GapApproved`,
+  `ParsedSheet`, `DroppedRow` (`NO_ANSWER`, `NO_QUESTION`), `IndexSettingsRequest`
+  (`ignoreTerms`; `MAX_TERMS` 20, `MIN_TERM_LENGTH` 1, `MAX_TERM_LENGTH` 60: the body of
+  journey's `PATCH /{index}/settings`, the knowledge-base embedding switch).
+
+### Changed (common-core), additively
+
+New trailing record components; the 2.1.0 constructor stays and fills them with the
+old meaning. A 2.1.0 payload reads into the new record (the new fields absent), and a
+2.2.0 payload reads into the 2.1.0 record (`ignoreUnknown`).
+
+| Record | New components | The 2.1.0 constructor gives |
+| --- | --- | --- |
+| `KnowledgeSearchRequest` | `query`, `threshold`, `diversity`, `Boolean recall` | `null` ×4: vector-only, no gate (the 9-argument constructor: `recall = null`, a serving search) |
+| `KnowledgeIndexSummary` | `sources`, `passages`, `pending`, `status`, `updatedAt`, `legacyName`, `ignoreTerms` | `passages = rowCount`, `READY`, `legacyName = isLegacy(name)`, `ignoreTerms = List.of()` (never null; the 12-argument constructor gives it too) |
+| `KnowledgeRow` | `sourceId`, `sourceName`, `sourceKind`, `url`, `locale`, `Boolean enabled`, `contentHash` | `enabled = TRUE`, the rest `null` |
+| `PatchUpsert` | `sourceId`, `Boolean enabled`, `contentHash` | `null` ×3 (journey keeps the row's flag, computes the hash) |
+| `GapReport` | `indexNames`, `source` (`SOURCE_KNOWLEDGE_STEP`, `SOURCE_FALLBACK`) | `null` ×2 |
+| `GapRecorded` | `merged` | `false` |
+| `GapGroup` | `hitCount`, `indexNames`, `source` | `hitCount = count`, `List.of()`, `null` |
+
+`KnowledgeRow.enabled` is a `Boolean`, not a `boolean`: a 2.1.0 payload has no such
+field, and a primitive would read it as `false` (every row disabled on a later save).
+`KnowledgeSourceView` gained `ignoreTerms` after its first 2.2.0 shape: null except in
+journey's answer to `POST /ingestion/claim` (`withIgnoreTerms`), and the 18-argument
+constructor (with the upload notes) stays. `KnowledgeSource` is deprecated for removal: journey answers `KnowledgeSourceView`,
+which also writes `sourceFile`, `chunks` and `lastIngested` (read-only JSON aliases) for
+one release, so a 2.1.0 reader of the source list keeps working.
+
+### Added (common-web): service calls (D4)
+
+- `security.internal.ServiceTokenAuthenticationFilter`: a request that carries a valid
+  `X-Service-Token` (`InternalServiceToken.matches`: trimmed, constant-time) and **no**
+  tenant credential (no `Authorization`, no `X-API-KEY`) gets a service-call session:
+  principal `platform-service`, authority `SERVICE`, details
+  `{authSource: SERVICE_TOKEN}`, no account. A request with a user's credential stays
+  the user's (an invalid one stays unauthenticated, so still 401), an existing session
+  is never replaced, a wrong token is logged without its value, and the filter never
+  answers itself. `serviceAuthentication()` builds that session for tests.
+- `security.internal.ServiceTokenAuthenticationConfig` (imported by
+  `@EnableCustomSecurity`): bean `serviceTokenAuthenticationFilter`, only when
+  `itways.internal-token` is set and not blank, with a **disabled**
+  `FilterRegistrationBean` (`serviceTokenAuthenticationFilterRegistration`) so the
+  container never runs it outside a chain.
+- `Sessions`: `isServiceCall(auth)`, `serviceCall()` (an `AuthorizationManager`),
+  `AUTH_SOURCE_SERVICE_TOKEN`, `AUTHORITY_SERVICE`, `SERVICE_PRINCIPAL`. `kindOf` says
+  `NONE` for a service call (no new `CredentialKind` constant, so an exhaustive
+  `switch` such as account-service's `ActivityRecorder` still compiles), hence
+  `userSession()` refuses it.
+
+A service that adopts it:
+
+```java
+private final ObjectProvider<ServiceTokenAuthenticationFilter> serviceTokenFilter;
+...
+.requestMatchers(KNOWLEDGE + "/ingestion/**").access(Sessions.serviceCall())   // before the broader rules
+...
+.addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+serviceTokenFilter.ifAvailable(f -> http.addFilterBefore(f, UsernamePasswordAuthenticationFilter.class));
+```
+
+`authenticated()` admits a service call too: a route that reads `@AccountId` gets
+`null` for one. Put the service-only rules first, and use `userSession()` (or an explicit
+rule) where an account is needed.
+
+### Build order
+
+```bash
+mvn -f common-lib/pom.xml install     # 2.2.0 (platform-bom, platform-parent first on an empty ~/.m2: make bootstrap)
+mvn -f ai-engine-sdk/pom.xml install  # 1.3.0 (L2), parent platform-parent 2.2.0
+mvn -f journey-engine/pom.xml install # 1.0.20 (L3): journey-engine-sdk depends on ai-engine-sdk, so after 1.3.0
+mvn -f journey-service/pom.xml install
+```
+
+Until `ai-engine-sdk` 1.3.0 and `journey-*` 1.0.20 are installed, a build on
+`platform-parent` 2.2.0 that depends on them cannot resolve them; `ai-engine-sdk`
+itself and services that use neither build at once.
+
+Checklist:
+
+- [ ] The service's own tests pass on 2.2.0 unchanged (only additions).
+- [ ] A service with service-only routes: a call with only the token reaches them; the
+      same call with a user's token, an API key or a wrong token does not.
 
 ## Commits read
 
