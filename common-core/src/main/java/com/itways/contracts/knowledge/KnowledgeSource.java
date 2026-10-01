@@ -9,7 +9,10 @@ import java.time.LocalDateTime;
  *
  * @param chunks       how many passages it holds
  * @param lastIngested when it was last stored, UTC
+ * @deprecated since 2.2.0 journey-service answers {@link KnowledgeSourceView}, which still writes
+ *             these three fields for one release; read that instead
  */
+@Deprecated(since = "2.2.0", forRemoval = true)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KnowledgeSource(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String sourceFile,
