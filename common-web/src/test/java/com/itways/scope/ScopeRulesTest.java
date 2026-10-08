@@ -46,16 +46,68 @@ class ScopeRulesTest {
 
     @Test
     void aNewRowWithNoOwnerIsRefusedRatherThanSilentlyShared() {
-        assertThatThrownBy(() -> rules.forCreate(null, null, null, ACCOUNT))
+        assertThatThrownBy(() -> rules.forCreate(null, null, (UUID) null, ACCOUNT))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
                     assertThat(e.getHttpStatus()).isEqualTo(400);
                     assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SCOPE_REQUIRED);
                 });
+        assertThatThrownBy(() -> rules.forCreate(null, null, SelectedScope.NONE, ACCOUNT))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SCOPE_REQUIRED));
+        assertThatThrownBy(() -> rules.forCreate(null, null, (SelectedScope) null, ACCOUNT))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SCOPE_REQUIRED));
+    }
+
+    // ── The Shared workspace selected (2.4.0) ────────────────────────────────
+
+    @Test
+    void theSharedWorkspaceSelectedMakesANewRowShared() {
+        assertThat(rules.forCreate(null, null, SelectedScope.SHARED, ACCOUNT)).isEqualTo(AssistantScope.SHARED);
+        assertThat(rules.forCreate(null, false, SelectedScope.SHARED, ACCOUNT)).isEqualTo(AssistantScope.SHARED);
+        verify(directory, never()).belongsTo(any(), any());
+    }
+
+    @Test
+    void aNamedAssistantWinsOverTheSharedWorkspace() {
+        assertThat(rules.forCreate(MINE, null, SelectedScope.SHARED, ACCOUNT).assistantId()).isEqualTo(MINE);
+        assertThatThrownBy(() -> rules.forCreate(OTHER_ACCOUNTS, null, SelectedScope.SHARED, ACCOUNT))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.ASSISTANT_NOT_FOUND));
+    }
+
+    @Test
+    void aSelectedAssistantBehavesLikeTheUuidOverload() {
+        assertThat(rules.forCreate(null, null, SelectedScope.assistant(MINE), ACCOUNT).assistantId())
+                .isEqualTo(MINE);
+        assertThatThrownBy(() -> rules.forCreate(null, null, SelectedScope.assistant(OTHER_ACCOUNTS), ACCOUNT))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.ASSISTANT_NOT_FOUND));
+    }
+
+    @Test
+    void anOwnerOnlyRowInTheSharedWorkspaceNeedsAnOwnerPicked() {
+        assertThatThrownBy(() -> rules.ownerForCreate(null, null, SelectedScope.SHARED, ACCOUNT, "A channel"))
+                .isInstanceOfSatisfying(BusinessException.class, e -> {
+                    assertThat(e.getHttpStatus()).isEqualTo(400);
+                    assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SCOPE_REQUIRED);
+                    assertThat(e.getMessage()).contains("pick an owner workspace");
+                });
+        // Naming an assistant from the Shared workspace is fine; shared=true never is.
+        assertThat(rules.ownerForCreate(MINE, null, SelectedScope.SHARED, ACCOUNT, "A channel")).isEqualTo(MINE);
+        assertThat(rules.ownerForCreate(null, null, SelectedScope.assistant(MINE), ACCOUNT, "A channel"))
+                .isEqualTo(MINE);
+        assertThatThrownBy(() -> rules.ownerForCreate(null, true, SelectedScope.SHARED, ACCOUNT, "A channel"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SHARED_NOT_ALLOWED));
+        assertThatThrownBy(() -> rules.ownerForCreate(null, null, SelectedScope.NONE, ACCOUNT, "A channel"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SCOPE_REQUIRED));
     }
 
     @Test
     void anotherAccountsAssistantIsNotFound() {
-        assertThatThrownBy(() -> rules.forCreate(OTHER_ACCOUNTS, null, null, ACCOUNT))
+        assertThatThrownBy(() -> rules.forCreate(OTHER_ACCOUNTS, null, (UUID) null, ACCOUNT))
                 .isInstanceOfSatisfying(BusinessException.class, e -> {
                     assertThat(e.getHttpStatus()).isEqualTo(404);
                     assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.ASSISTANT_NOT_FOUND);
@@ -66,7 +118,7 @@ class ScopeRulesTest {
 
     @Test
     void anOwnerOnlyRowCannotBeShared() {
-        assertThatThrownBy(() -> rules.ownerForCreate(MINE, true, null, ACCOUNT, "A channel"))
+        assertThatThrownBy(() -> rules.ownerForCreate(MINE, true, (UUID) null, ACCOUNT, "A channel"))
                 .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ScopeErrors.SHARED_NOT_ALLOWED));
         assertThat(rules.ownerForCreate(null, null, MINE, ACCOUNT, "A channel")).isEqualTo(MINE);

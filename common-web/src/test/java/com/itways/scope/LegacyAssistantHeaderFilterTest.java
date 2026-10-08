@@ -64,6 +64,22 @@ class LegacyAssistantHeaderFilterTest {
     }
 
     @Test
+    void theSharedSentinelAndMalformedValuesPassThroughUntouched() throws Exception {
+        for (String value : new String[] { ScopeHeaders.SHARED_VALUE, "SHARED", "not-a-uuid" }) {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader(ScopeHeaders.LEGACY_ASSISTANT, value);
+
+            HttpServletRequest seen = passThrough(request);
+
+            assertThat(seen.getHeader(ScopeHeaders.ASSISTANT)).isEqualTo(value);
+            assertThat(seen.getHeader(ScopeHeaders.LEGACY_ASSISTANT)).isEqualTo(value);
+        }
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(ScopeHeaders.ASSISTANT, ScopeHeaders.SHARED_VALUE);
+        assertThat(passThrough(request)).isSameAs(request);
+    }
+
+    @Test
     void aRequestWithoutEitherIsLeftAlone() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
 

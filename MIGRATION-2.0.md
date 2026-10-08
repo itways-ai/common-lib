@@ -15,7 +15,8 @@ Two things change for a service as soon as it moves, before it adopts any helper
   `X-Request-Id`, and error bodies carry `reference` (section 5). Opt out with
   `itways.request-id.enabled=false`.
 
-Already on 2.0.0? Section 7 lists what 2.1.0 changes; on 2.1.0, section 8 lists 2.2.0.
+Already on 2.0.0? Section 7 lists what 2.1.0 changes; on 2.1.0, section 8 lists 2.2.0;
+on 2.2.0, section 9 lists 2.3.0.
 
 Order of work for one consumer:
 
@@ -1159,6 +1160,155 @@ Checklist:
 - [ ] The service's own tests pass on 2.2.0 unchanged (only additions).
 - [ ] A service with service-only routes: a call with only the token reaches them; the
       same call with a user's token, an API key or a wrong token does not.
+
+## 9. 2.3.0 (from 2.2.0)
+
+> The product concept these names belong to was renamed in 2.5.0 (section 11): the
+> 2.3.0 names below are kept as they shipped; section 11 maps them to the current ones.
+
+An additive minor release for the integrations feature (work package WP-1 of its
+design, `Documents/Architecture/connectors-design-2026-10-03.html`). Nothing a
+consumer compiles against is removed or changed: `MailSecrets` and `ChannelSecrets`
+keep every public constructor and method, and every value they sealed before opens
+unchanged (`SealedSecretsGoldenVectorsTest` opens values produced by the 2.2.0
+classes from a committed fixture).
+
+### What a consumer does
+
+1. `<parent>` → `platform-parent` **2.3.0**. The BOM then gives `common-*` 2.3.0; the
+   SDK pins are unchanged (`ai-engine-sdk` 1.3.0, `file-storage-sdk` 2.0.2,
+   `journey-model` / `journey-engine-sdk` 1.0.20) until journey-engine 1.1.0 (WP-2) is
+   released and pinned here.
+2. Nothing else is required. No stored value changes: `ms:` and `cs:` values keep their
+   bytes, their key ids and their associated data, so no reseal or migration runs.
+3. journey-service, when it adds integrations (WP-3), puts `@EnableIntegrationSecrets`
+   on its application class and gets `INTEGRATION_SECRETS_KEY` in compose and `.env`.
+4. account-service's activity consumer sees the new `ActivityCategory.INTEGRATION`
+   once it is on 2.3.0; it stores the category as text, so events of that category
+   arriving earlier are not rejected by the enum, but a consumer still on 2.2.0 that
+   deserialises `AccountActivityEvent` with Jackson would fail on the unknown enum value.
+   Release account-service on 2.3.0 before journey-service publishes `INTEGRATION`
+   events.
+
+### Added (common-web): `encryption.SealedSecrets`
+
+The one single-key AES-256-GCM cipher behind the three secret kinds, parameterised:
+
+- `new SealedSecrets(prefix, currentKey, previousKey)` (prefix such as `"is:"`, 32-byte
+  keys; `decodeKey(base64, variable)` reads one from a setting with the usual messages);
+  `seal(plain, aad)`, `open(sealed, aad)`, `reseal(value, aad)`, `isCurrent(value)`,
+  `isSealedValue(value)`, static `isSealed(value, prefix)`, `prefix()`,
+  `currentKeyId()`, static `context(parts...)` (`a|b|c` as UTF-8).
+- Wire format unchanged: `<prefix><kid>:` + Base64(12-byte nonce + ciphertext + tag),
+  `kid` = first 8 hex of SHA-256(key). The associated data is per call; the prefix is a
+  label, not part of the binding, so each kind of secret has its own context.
+- `MailSecrets` (`ms:`, context `mail-secret`) and `ChannelSecrets` (`cs:`, context
+  `channel-secret`) are now thin subclasses: same constructors, same `seal`/`open`/
+  `reseal`/`isCurrent`/static `isSealed` (mail) and `encrypt`/`decrypt`/`isCurrent`
+  (channel), same pass-through of legacy plain values, same startup messages. Failure
+  messages say "sealed"/"open" for both kinds now (channel used to say
+  "encrypted"/"decrypt"); no consumer asserted on them. They also expose the base
+  class's `prefix()`, `currentKeyId()` and the two-argument methods.
+- `IntegrationSecrets` (`is:`): `seal(plain, instanceId, accountId, field)`,
+  `open(sealed, instanceId, accountId, field)`, `reseal(...)`, static `isSealed(value)`,
+  static `context(instanceId, accountId, field)` = `instanceId|accountId|field`. No legacy
+  plain values: `open` refuses anything without the `is:` prefix.
+- `IntegrationSecretsConfig` and `@EnableIntegrationSecrets` (`com.itways.annotation`),
+  the `MailSecretsConfig` shape: bean `integrationSecrets` from
+  `integration.secrets.key` (default env `INTEGRATION_SECRETS_KEY`) and
+  `integration.secrets.previous-key` (`INTEGRATION_SECRETS_KEY_PREVIOUS`); required
+  unless `itways.integration-secrets.required=false` (then no bean and a WARN when
+  blank); a service's own `IntegrationSecrets` bean wins.
+
+### Added (common-core): `common.net.HostAllowList`
+
+The allow-list rule that journey-engine's `EgressGuard`, notification-service's
+`TenantMailGuard` and common-web's `PublicOnlyDnsResolver` each copied, hoisted once:
+
+- `HostAllowList.parse("a.example, .corp.internal, 10.0.0.5, [fd00::5]")` or
+  `of(Collection<String>)`; `EMPTY`; `allows(String host)`, `allows(URI)` (the host
+  only; the `user@host` trick and ports do not change the verdict), `isEmpty()`,
+  `entries()`, static `normalize(host)`.
+- Entries: an exact host name, an IP literal, or a `.domain` suffix (the domain and its
+  subdomains). Hosts and entries are compared normalised (lower case, no trailing dot,
+  no IPv6 brackets, IDN as punycode, one IPv6 spelling). Numeric shorthand (`127.1`,
+  `2130706433`, `0x7f000001`, leading-zero octets) never matches an address entry; a
+  suffix never matches an IP literal.
+- An entry that is not a host (a URL, `host:port`, `user@host`, `*.domain`, `.`) is
+  refused with an `IllegalArgumentException` when the list is built. This is the one
+  behaviour change a consumer can see: `PublicOnlyDnsResolver(Collection<String>)` now
+  fails at construction on such an entry instead of silently never matching it.
+  `EgressGuard` and `TenantMailGuard` are untouched in this release.
+
+### Added (common-messaging)
+
+`ActivityCategory.INTEGRATION`, for the `INTEGRATION_*` and `CONNECTOR_TYPE_*`
+activity entries journey-service will write.
+
+### Build order
+
+```bash
+mvn -f common-lib/pom.xml install     # 2.3.0 (platform-bom, platform-parent first on an empty ~/.m2: make bootstrap)
+mvn -f journey-engine/pom.xml install # 1.1.0 (WP-2), parent platform-parent 2.3.0
+mvn -f journey-service/pom.xml install
+```
+
+Checklist:
+
+- [ ] The service's own tests pass on 2.3.0 unchanged (only additions).
+- [ ] Stored `ms:` / `cs:` values still open (the golden-vector test proves the format;
+      a service's own round-trip tests confirm its wiring).
+- [ ] A service that builds a `PublicOnlyDnsResolver` from an operator list: every
+      entry is a host name, an IP literal or a `.domain` suffix.
+
+## 10. 2.4.0 (from 2.3.0)
+
+Only additions: the virtual Shared workspace in `com.itways.scope` (README,
+"The Shared workspace (2.4.0)"). `SelectedScope`, `ScopeHeaders.SHARED_VALUE`,
+`AssistantHeader` public (`read` → `SelectedScope`, `raw` → `String`),
+`ScopeRules.forCreate` / `ownerForCreate` overloads taking a `SelectedScope`,
+`ScopeErrors.ownerRequired`.
+
+Checklist for a service:
+
+- [ ] Parent `platform-parent` 2.4.0.
+- [ ] Controllers that bind `X-Assistant-Id` as `@RequestHeader UUID` bind a
+      `String` and call `SelectedScope.parse` (or `AssistantHeader.read`), then pass
+      the `SelectedScope` to `ScopeRules`; otherwise the header value `shared` is a
+      400 before the service sees it.
+- [ ] Tests that mock `forCreate` / `ownerForCreate` with an untyped `any()` for the
+      selected assistant type it (`any(UUID.class)` or `any(SelectedScope.class)`).
+
+## 11. 2.5.0 (from 2.4.0)
+
+The product concept is renamed to "connectors" everywhere in the library. Nothing
+else changes; the release breaks the compile of the one consumer that uses the old
+names (journey-service) and the activity data of account-service.
+
+| 2.3.0 / 2.4.0 | 2.5.0 |
+| --- | --- |
+| `com.itways.encryption.IntegrationSecrets` | `com.itways.encryption.ConnectorSecrets` |
+| `com.itways.encryption.IntegrationSecretsConfig` (bean `integrationSecretsConfig`) | `com.itways.encryption.ConnectorSecretsConfig` (bean `connectorSecretsConfig`) |
+| `@com.itways.annotation.EnableIntegrationSecrets` | `@com.itways.annotation.EnableConnectorSecrets` |
+| bean `integrationSecrets` | bean `connectorSecrets` |
+| property `integration.secrets.key` / `integration.secrets.previous-key` | `connector.secrets.key` / `connector.secrets.previous-key` |
+| env `INTEGRATION_SECRETS_KEY` / `INTEGRATION_SECRETS_KEY_PREVIOUS` | `CONNECTOR_SECRETS_KEY` / `CONNECTOR_SECRETS_KEY_PREVIOUS` |
+| property `itways.integration-secrets.required` | `itways.connector-secrets.required` |
+| failure messages "integration secret" | "connector secret" |
+| `ActivityCategory.INTEGRATION` | `ActivityCategory.CONNECTOR` |
+
+Unchanged on purpose: the `is:` prefix of sealed values, the key id and the
+associated data (`instanceId|accountId|field`), so every value sealed under 2.3.0 or
+2.4.0 opens with `ConnectorSecrets` under the same key, without a reseal.
+
+Checklist for a service:
+
+- [ ] Parent `platform-parent` 2.5.0.
+- [ ] journey-service: the class, annotation and bean names above; the key moves to
+      `CONNECTOR_SECRETS_KEY` (same value) in compose and `.env`.
+- [ ] account-service: a data migration rewrites stored activity category
+      `INTEGRATION` to `CONNECTOR` before the new enum reads them; release it with or
+      before the journey-service that publishes `CONNECTOR`.
 
 ## Commits read
 

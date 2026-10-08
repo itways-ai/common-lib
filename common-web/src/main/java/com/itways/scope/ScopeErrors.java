@@ -34,6 +34,17 @@ public final class ScopeErrors {
                 INVALID_SCOPE, 400);
     }
 
+    /**
+     * 400 {@code SCOPE_REQUIRED}: this kind of row always belongs to one
+     * assistant, and the console is on the Shared workspace, so nothing named an
+     * owner. Not {@link #sharedNotAllowed}: the caller did not ask for sharing,
+     * it just has to pick an owner.
+     */
+    public static BusinessException ownerRequired(String what) {
+        return new BusinessException(
+                what + " cannot live in the Shared workspace: pick an owner workspace", SCOPE_REQUIRED, 400);
+    }
+
     /** 400: this kind of row always belongs to one assistant. */
     public static BusinessException sharedNotAllowed(String what) {
         return new BusinessException(what + " always belongs to one assistant and cannot be shared",

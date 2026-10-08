@@ -22,7 +22,7 @@
 
     <groupId>com.itways</groupId>
     <artifactId>platform-parent</artifactId>
-    <version>2.2.0</version>
+    <version>2.5.0</version>
     <packaging>pom</packaging>
 
     <name>platform-parent</name>
@@ -37,7 +37,7 @@
             with every release. Children re-interpolate ${project.version} as their own
             version, so it must not be used here.
         -->
-        <platform-bom.version>2.2.0</platform-bom.version>
+        <platform-bom.version>2.5.0</platform-bom.version>
 
         <!-- Boot 3.2 pins Testcontainers 1.19, whose Docker API version Docker 29 refuses; Boot honours this property. -->
         <testcontainers.version>1.21.4</testcontainers.version>

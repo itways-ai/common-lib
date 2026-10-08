@@ -64,6 +64,51 @@ class RequestedScopeArgumentResolverTest {
         assertThat(resolve(new MockHttpServletRequest())).isEqualTo(ListScope.ALL);
     }
 
+    // ── The Shared workspace (2.4.0) ─────────────────────────────────────────
+
+    @Test
+    void theSharedSentinelInTheHeaderListsSharedOnly() {
+        for (String header : new String[] { ScopeHeaders.ASSISTANT, ScopeHeaders.LEGACY_ASSISTANT }) {
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader(header, ScopeHeaders.SHARED_VALUE);
+
+            assertThat(resolve(request)).isEqualTo(ListScope.SHARED);
+        }
+        MockHttpServletRequest upperCase = new MockHttpServletRequest();
+        upperCase.addHeader(ScopeHeaders.ASSISTANT, "SHARED");
+        assertThat(resolve(upperCase)).isEqualTo(ListScope.SHARED);
+    }
+
+    @Test
+    void theScopeParameterStillWinsOverTheSharedSentinel() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(ScopeHeaders.ASSISTANT, ScopeHeaders.SHARED_VALUE);
+        request.setParameter(ScopeHeaders.SCOPE_PARAM, SELECTED.toString());
+        assertThat(resolve(request)).isEqualTo(ListScope.assistant(SELECTED));
+
+        request.setParameter(ScopeHeaders.SCOPE_PARAM, "all");
+        assertThat(resolve(request)).isEqualTo(ListScope.ALL);
+    }
+
+    @Test
+    void aScopeParameterIsNotA400ForAMalformedHeader() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(ScopeHeaders.ASSISTANT, "not-a-uuid");
+        request.setParameter(ScopeHeaders.SCOPE_PARAM, "all");
+
+        assertThat(resolve(request)).isEqualTo(ListScope.ALL);
+    }
+
+    @Test
+    void theStaticResolveReadsTheSentinelTheSameWay() {
+        assertThat(RequestedScopeArgumentResolver.resolve(null, "shared")).isEqualTo(ListScope.SHARED);
+        assertThat(RequestedScopeArgumentResolver.resolve(null, SELECTED.toString()))
+                .isEqualTo(ListScope.assistant(SELECTED));
+        assertThat(RequestedScopeArgumentResolver.resolve("shared", SELECTED.toString())).isEqualTo(ListScope.SHARED);
+        assertThat(RequestedScopeArgumentResolver.resolve(SELECTED.toString(), "shared"))
+                .isEqualTo(ListScope.assistant(SELECTED));
+    }
+
     @Test
     void aMalformedLegacyHeaderIsA400LikeTheNewOne() {
         for (String header : new String[] { ScopeHeaders.ASSISTANT, ScopeHeaders.LEGACY_ASSISTANT }) {

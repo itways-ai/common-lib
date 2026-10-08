@@ -190,6 +190,42 @@ class KnowledgeContractsJsonTest {
         assertThat(report.source()).isNull();
     }
 
+    /** A 2.2.0 parsed sheet (rows, dropped, droppedRows only) reads; the 2.3.0 structure survives the wire. */
+    @Test
+    void aParsedSheetWithoutStructureStillReads() throws Exception {
+        ParsedSheet old = read("""
+                {"rows":[{"question":"q","answer":"a","category":null,"notes":"","rowNumber":2}],"dropped":1,
+                 "droppedRows":[{"rowNumber":3,"question":"x?","reason":"NO_ANSWER"}]}""", ParsedSheet.class);
+        assertThat(old.rows()).containsExactly(new ParsedRow("q", "a", null, "", 2));
+        assertThat(old.dropped()).isEqualTo(1);
+        assertThat(old.kind()).isNull();
+        assertThat(old.passages()).isZero();
+        assertThat(old.truncated()).isFalse();
+        assertThat(old.sheets()).isNull();
+
+        ParsedBlock qa = new ParsedBlock(null, ParsedBlock.MODE_QA, "A1:C3", 1, List.of("Question", "Answer", "Notes"),
+                List.of(ParsedBlock.ROLE_QUESTION, ParsedBlock.ROLE_ANSWER, ParsedBlock.ROLE_NOTES), 1.0, 2, 2,
+                List.of(List.of("q", "a", ""), List.of("q2", "a2", "n")));
+        ParsedBlock prose = new ParsedBlock("About us", ParsedBlock.MODE_PROSE, "A5:A9", null, List.of("A"),
+                List.of(ParsedBlock.ROLE_OTHER), 0.0, 4, 1, List.of(List.of("Line one"), List.of("Line two")));
+        ParsedSheet sheet = new ParsedSheet(List.of(new ParsedRow("q", "a", null, null, 2)), 0, List.of(),
+                KnowledgeSourceView.KIND_SHEET, 3, true,
+                List.of(new ParsedWorksheet("FAQ", 0, false, 9, 3, List.of(qa, prose)),
+                        new ParsedWorksheet("Draft", 1, true, 0, 0, List.of())));
+        JsonNode node = MAPPER.readTree(MAPPER.writeValueAsString(sheet));
+        assertThat(node.get("kind").asText()).isEqualTo("SHEET");
+        assertThat(node.get("passages").asInt()).isEqualTo(3);
+        assertThat(node.get("truncated").asBoolean()).isTrue();
+        assertThat(node.get("sheets").get(0).get("blocks").get(0).get("mode").asText()).isEqualTo("QA");
+        assertThat(node.get("sheets").get(0).get("blocks").get(0).get("headerRow").asInt()).isEqualTo(1);
+        assertThat(node.get("sheets").get(0).get("blocks").get(1).get("headerRow").isNull()).isTrue();
+        assertThat(node.get("sheets").get(0).get("blocks").get(1).get("title").asText()).isEqualTo("About us");
+        assertThat(node.get("sheets").get(0).get("blocks").get(0).get("samples").get(1).get(2).asText()).isEqualTo("n");
+        assertThat(node.get("sheets").get(1).get("hidden").asBoolean()).isTrue();
+        assertThat(node.get("sheets").get(1).get("blocks")).isEmpty();
+        assertThat(roundTrip(sheet, ParsedSheet.class)).isEqualTo(sheet);
+    }
+
     @Test
     void aSourceViewStillAnswersAsTheOldSourceForOneRelease() throws Exception {
         KnowledgeSourceView view = new KnowledgeSourceView(3L, KnowledgeSourceView.KIND_DOCUMENT, "guide.pdf", null,

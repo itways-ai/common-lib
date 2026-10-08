@@ -16,6 +16,14 @@ public final class ScopeHeaders {
     public static final String ASSISTANT = "X-Assistant-Id";
 
     /**
+     * The value of {@link #ASSISTANT} (or of {@link #SCOPE_PARAM}) that selects the
+     * virtual Shared workspace instead of an assistant (2.4.0): the console is on
+     * the shared rows, so lists show shared only and new rows are shared. See
+     * {@link SelectedScope}.
+     */
+    public static final String SHARED_VALUE = "shared";
+
+    /**
      * The name {@link #ASSISTANT} had before 2.1.0, still accepted when a request
      * does not send {@link #ASSISTANT}. Nothing in the platform should send it:
      * it is read only so that a portal or service not yet moved keeps working.

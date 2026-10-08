@@ -33,7 +33,8 @@ public class LegacyAssistantHeaderFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        String legacy = AssistantHeader.read(request::getHeader);
+        // The value as sent, "shared" and malformed ones included: the controller decides.
+        String legacy = AssistantHeader.raw(request::getHeader);
         filterChain.doFilter(legacy == null ? request : new WithAssistantHeader(request, legacy), response);
     }
 

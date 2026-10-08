@@ -38,14 +38,31 @@ public class ScopeRules {
      * @param selected  the console's selected assistant ({@link ScopeHeaders#ASSISTANT}), or null
      */
     public AssistantScope forCreate(UUID requested, Boolean shared, UUID selected, String accountId) {
+        return forCreate(requested, shared, SelectedScope.of(selected), accountId);
+    }
+
+    /**
+     * The scope of a new row (2.4.0): {@code shared=true} shares it; else the
+     * named assistant; else the console's selection, where the Shared
+     * workspace shares it; else {@code SCOPE_REQUIRED}.
+     *
+     * @param requested the assistant the request names, or null
+     * @param shared    the request's {@code shared} flag, or null
+     * @param selected  what the console selected ({@link AssistantHeader#read}); null is {@link SelectedScope#NONE}
+     */
+    public AssistantScope forCreate(UUID requested, Boolean shared, SelectedScope selected, String accountId) {
         if (Boolean.TRUE.equals(shared)) {
             return AssistantScope.SHARED;
         }
-        UUID assistantId = requested != null ? requested : selected;
-        if (assistantId == null) {
-            throw ScopeErrors.scopeRequired();
+        if (requested != null) {
+            return AssistantScope.of(requireOwn(requested, accountId));
         }
-        return AssistantScope.of(requireOwn(assistantId, accountId));
+        SelectedScope selection = selected == null ? SelectedScope.NONE : selected;
+        return switch (selection.kind()) {
+            case ASSISTANT -> AssistantScope.of(requireOwn(selection.assistantId(), accountId));
+            case SHARED -> AssistantScope.SHARED;
+            case NONE -> throw ScopeErrors.scopeRequired();
+        };
     }
 
     /**
@@ -53,8 +70,22 @@ public class ScopeRules {
      * exactly one assistant).
      */
     public UUID ownerForCreate(UUID requested, Boolean shared, UUID selected, String accountId, String what) {
+        return ownerForCreate(requested, shared, SelectedScope.of(selected), accountId, what);
+    }
+
+    /**
+     * The owner of a new row that can never be shared (2.4.0). {@code shared=true}
+     * is {@code SHARED_NOT_ALLOWED}; the Shared workspace selected with no
+     * assistant named is {@code SCOPE_REQUIRED} ("pick an owner workspace"),
+     * because the caller did not ask for sharing, it just has to choose.
+     */
+    public UUID ownerForCreate(UUID requested, Boolean shared, SelectedScope selected, String accountId,
+            String what) {
         if (Boolean.TRUE.equals(shared)) {
             throw ScopeErrors.sharedNotAllowed(what);
+        }
+        if (requested == null && selected != null && selected.shared()) {
+            throw ScopeErrors.ownerRequired(what);
         }
         return forCreate(requested, false, selected, accountId).assistantId();
     }

@@ -186,6 +186,34 @@ class KnowledgeContractsCompatibilityTest {
         assertThat(IndexSettingsRequest.MAX_TERM_LENGTH).isEqualTo(60);
     }
 
+    /** The 2.2.0 parsed sheet (rows, dropped, dropped rows) carries no structure; the 2.3.0 one does. */
+    @Test
+    void theOldParsedSheetHasNoStructure() {
+        ParsedSheet old = new ParsedSheet(List.of(new ParsedRow("q", "a", null, null, 2)), 1,
+                List.of(new DroppedRow(3, DroppedRow.NO_ANSWER)));
+
+        assertThat(old.kind()).isNull();
+        assertThat(old.passages()).isZero();
+        assertThat(old.truncated()).isFalse();
+        assertThat(old.sheets()).isNull();
+        assertThat(old.rows()).hasSize(1);
+
+        ParsedBlock block = new ParsedBlock("Prices", ParsedBlock.MODE_RECORDS, "A1:B4", 2, List.of("Item", "Price"),
+                List.of(ParsedBlock.ROLE_OTHER, ParsedBlock.ROLE_OTHER), 0.7, 3, 1,
+                List.of(List.of("Apple", "1.20"), List.of("Pear", "0.90")));
+        ParsedSheet structured = new ParsedSheet(List.of(), 0, List.of(), KnowledgeSourceView.KIND_DOCUMENT, 1, false,
+                List.of(new ParsedWorksheet("Sheet1", 0, false, 4, 2, List.of(block)),
+                        new ParsedWorksheet("Hidden", 1, true, 0, 0, List.of())));
+        assertThat(structured.kind()).isEqualTo("DOCUMENT");
+        assertThat(structured.sheets()).hasSize(2);
+        assertThat(structured.sheets().get(1).hidden()).isTrue();
+        assertThat(structured.sheets().get(0).blocks().get(0).roles()).containsExactly("OTHER", "OTHER");
+        assertThat(ParsedBlock.MODE_QA).isEqualTo("QA");
+        assertThat(ParsedBlock.MODE_KEY_VALUE).isEqualTo("KEY_VALUE");
+        assertThat(ParsedBlock.MODE_PROSE).isEqualTo("PROSE");
+        assertThat(ParsedBlock.ROLE_QUESTION).isEqualTo("QUESTION");
+    }
+
     @Test
     void theOldRowIsEnabledWithoutASource() {
         KnowledgeRow row = new KnowledgeRow(1L, "q", "a", "c", "n", 3);

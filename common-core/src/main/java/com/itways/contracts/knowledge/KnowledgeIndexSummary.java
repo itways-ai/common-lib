@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -30,6 +31,10 @@ import java.util.UUID;
  * @param ignoreTerms words and phrases (brand names, say) left out of the passage and query
  *                    text before either is embedded, set with {@link IndexSettingsRequest}; never
  *                    null, empty when none (2.2.0, the embedding switch)
+ * @param passagesByLocale how many passages carry each language tag ({@code "en"}, {@code "ar"}, as
+ *                    stored); untagged passages are not counted. What a search reads to tell whether
+ *                    a question is in another language than the index (cross-language search,
+ *                    2.3.0); never null, empty when no passage is tagged or in an older payload
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KnowledgeIndexSummary(
@@ -45,15 +50,44 @@ public record KnowledgeIndexSummary(
         String status,
         LocalDateTime updatedAt,
         boolean legacyName,
-        List<String> ignoreTerms) {
+        List<String> ignoreTerms,
+        Map<String, Long> passagesByLocale) {
 
     public static final String STATUS_READY = "READY";
     public static final String STATUS_PROCESSING = "PROCESSING";
     public static final String STATUS_FAILED = "FAILED";
 
-    /** A missing list (an older payload) reads as none; null entries are dropped. */
+    /** A missing list or map (an older payload) reads as none; null entries are dropped. */
     public KnowledgeIndexSummary {
         ignoreTerms = ignoreTerms == null ? List.of() : ignoreTerms.stream().filter(Objects::nonNull).toList();
+        passagesByLocale = passagesByLocale == null ? Map.of() : Map.copyOf(passagesByLocale.entrySet().stream()
+                .filter(e -> e.getKey() != null && e.getValue() != null)
+                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    /** The shape before the locale counts (2.2.0): none known. */
+    public KnowledgeIndexSummary(Long id, String name, UUID assistantId, boolean shared, String description,
+            long rowCount, long sources, long passages, long pending, String status, LocalDateTime updatedAt,
+            boolean legacyName, List<String> ignoreTerms) {
+        this(id, name, assistantId, shared, description, rowCount, sources, passages, pending, status, updatedAt,
+                legacyName, ignoreTerms, Map.of());
+    }
+
+    /**
+     * The language most of the index's tagged passages are in, when one holds more than
+     * {@code share} of them (0.5: a clear majority); null when no passage is tagged, or none
+     * dominates. What a cross-language search compares the question's language with.
+     */
+    public String dominantLocale(double share) {
+        long total = passagesByLocale.values().stream().mapToLong(Long::longValue).sum();
+        if (total <= 0) {
+            return null;
+        }
+        return passagesByLocale.entrySet().stream()
+                .filter(e -> e.getValue() > share * total)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
     }
 
     /** The shape before ignore terms: none. */

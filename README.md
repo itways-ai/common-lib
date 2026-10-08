@@ -5,7 +5,7 @@ reactor of five modules: the parent POM and BOM every service builds with, and t
 shared library split in three jars by what they need at runtime.
 
 Upgrading from 1.0.13: see [MIGRATION-2.0.md](MIGRATION-2.0.md); from 2.0.0 to 2.1.0:
-its section 7; from 2.1.0 to 2.2.0: its section 8.
+its section 7; from 2.1.0 to 2.2.0: its section 8; from 2.2.0 to 2.3.0: its section 9; from 2.3.0 to 2.4.0: its section 10; from 2.4.0 to 2.5.0: its section 11.
 
 | Module | Coordinates | What it is |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ its section 7; from 2.1.0 to 2.2.0: its section 8.
 | `common-messaging` | `com.itways:common-messaging` | The RabbitMQ side: JSON conversion, publisher confirms and returns, the activity and notification publishers with their DTOs, the transactional activity outbox. Depends on `common-core`. |
 
 `common-web` and `common-messaging` do not depend on each other; a service takes the
-ones it needs. All five share one version (`2.2.0`). Java 21, Spring Boot 3.2.x.
+ones it needs. All five share one version (`2.5.0`). Java 21, Spring Boot 3.2.x.
 
 The packages did not move with the split: `com.itways.*` names are the same as in
 `common-lib` 1.x, only the jar that holds them changed. Two packages are spread over
@@ -89,6 +89,7 @@ bean names the former scan gave (`EnableAnnotationsBeanNamesTest`).
 | `@EnableCustomSecurity` | common-web | `security.config.SecurityConfig` + `@EnableCache` | `JwtTokenProvider`, `JwtAuthenticationFilter`, `ApiKeyAuthenticationFilter`, `SecurityUtils`, `ApiKeyProvider`, the session-revocation and API-key allow-list stores, `@AccountId` resolver, `InternalServiceToken`, the shared 401/403 handlers, `ClientIpResolver` and `ServiceCalls` (ARC-11; beans only, nothing switched on); with `itways.internal-token` set, `ServiceTokenAuthenticationFilter` (2.2.0; a bean for the service's chain to add, never run by the container on its own, see "Service calls") |
 | `@EnableInternalEndpointGuard` | common-web | `security.internal.InternalEndpointGuardConfig` | The `/internal/` guard filter (`internalEndpointGuard`, see "Shared helpers"); needs `@EnableCustomSecurity` |
 | `@EnableMailSecrets` | common-web | `encryption.MailSecretsConfig` | The `MailSecrets` bean from `MAIL_SECRETS_KEY`, required unless `itways.mail-secrets.required=false` |
+| `@EnableConnectorSecrets` | common-web | `encryption.ConnectorSecretsConfig` | The `ConnectorSecrets` bean from `CONNECTOR_SECRETS_KEY` (2.3.0; the credentials stored on connectors, journey-service only), required unless `itways.connector-secrets.required=false` |
 | `@EnableCache` | common-web | `cache.config.CacheConfig` + `@EnableCaching` | `CacheStoreFactory` (Ehcache, Redis, hybrid) and the bounded `CacheManager` |
 | `@EnableAssistantScope` | common-web | `scope.AssistantScopeConfig` | `AssistantDirectory`, `ScopeRules`, `@RequestedScope ListScope` parameters (needs a `JdbcTemplate`; spring-jdbc is optional here), and `LegacyAssistantHeaderConfig` like `@EnableCommon` |
 | `@EnableEncryption` | common-web | `encryption.EncryptionConfig` | `RsaService` (the `EncryptionService`); `ChannelSecrets` and `MailSecrets` are static helpers of that package |
@@ -134,7 +135,7 @@ is now Spring Boot's.
 | `contracts` | core | Payloads services exchange: `account`, `channels`, `journey`, `knowledge`, `template` (`TemplateVariable` keeps its `optional` flag and 3-argument constructor). Their `@Schema` descriptions feed the portal's OpenAPI specs; the annotation library is optional. `knowledge` also holds `KnowledgeIndexName`, the index-name rule (2.2.0). |
 | `common.text` | core | `PiiScrubber` (e-mail addresses and phone numbers out of stored text) and `PassageHashes` (the knowledge passage and source hashes, equal to journey-service's SQL) (2.2.0). |
 | `common.response`, `common.constants`, `common.exception` | core | Envelope (`ApiResponse`, `PageResponse`), error codes, `BusinessException`, `InvalidApiKeyException`. |
-| `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). `IpLiterals`, `TrustedProxies` and `ClientIp`: the client-IP rule behind our proxies (the gateway's, shared). |
+| `common.net` | core | `PublicUrlPolicy`: whether a tenant-supplied URL may be called (SSRF guard). `HostAllowList` (2.3.0): the one allow-list rule for hosts an operator lets through that guard (exact name, IP literal, `.domain` suffix; normalised matching; refuses entries that are not hosts), used by `PublicOnlyDnsResolver` and meant for `EgressGuard`, `TenantMailGuard` and the connectors' per-connector lists. `IpLiterals`, `TrustedProxies` and `ClientIp`: the client-IP rule behind our proxies (the gateway's, shared). |
 | `common.util` | core | `UtcDateTimes`. |
 | `common.correlation` | core | `RequestIds`: the request-id rule (names, well-formedness, accept or generate) the gateway and the services share. |
 | `security`, `security.jwt`, `security.servlet` | web | The Spring side: `JwtTokenProvider`, `SecurityUtils`, `ApiKeyProvider`, `SessionRevocationStore`, `ApiKeyStatusStore`, the two servlet filters, `ApiResponseAuthenticationEntryPoint` / `ApiResponseAccessDeniedHandler`; `Sessions` (the USER_SESSION rule and the details keys) and `ClientIpResolver` (the servlet side of `ClientIp`). |
@@ -145,7 +146,7 @@ is now Spring Boot's.
 | `security.config`, `security.resolver`, `security.annotation` | web | Security wiring, `@AccountId`. |
 | `scope` | web | Per-assistant scoping: `AssistantScope`, `ScopeRules`, `ListScope`, `RequestedScopeArgumentResolver`, `ScopeHeaders`, `ScopeErrors`; `LegacyAssistantHeaderFilter` / `LegacyAssistantHeaderConfig` (the old header name, during the rename). |
 | `cache` | web | `CacheStore` / `CacheStoreFactory` with Ehcache, Redis and hybrid stores; `CacheProperties`. |
-| `encryption` | web | `ChannelSecrets` (`CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords), `EncryptionService`, `RsaService`. |
+| `encryption` | web | `SealedSecrets` (2.3.0): the one single-key AES-256-GCM cipher (`<prefix><kid>:` + Base64, a context per call, current + previous key, `seal` / `open` / `reseal` / `isCurrent`); its subclasses `ChannelSecrets` (`cs:`, `CHANNEL_SECRETS_KEY`: channel provider secrets), `MailSecrets` (`ms:`, `MAIL_SECRETS_KEY`: SEND_MAIL SMTP passwords) and `ConnectorSecrets` (`is:`, `CONNECTOR_SECRETS_KEY`: connector credentials, context `instanceId|accountId|field`); `EncryptionService`, `RsaService`. Stored `ms:` / `cs:` values are unchanged (`SealedSecretsGoldenVectorsTest`). |
 | `common.diagnostics` | web | `DatabaseLoginFailureAnalyzer`: startup failure analysis for a refused database login. |
 | `common.config`, `common.handler` | web | `CommonConfig`, `SwaggerConfig`, `TimeConfig`, the OpenAPI customizers; the exception handlers (`GlobalExceptionHandler` is an overridable base, see "Shared helpers") and `/error` controller. |
 | `feign`, `freemarker`, `jpa` | web | The opt-in integrations above. |
@@ -405,6 +406,30 @@ the portal and the services move over:
 Removal: once no caller sends the legacy name, delete `LEGACY_ASSISTANT`,
 `LegacyAssistantHeaderFilter` and `LegacyAssistantHeaderConfig` in a major release.
 
+### The Shared workspace (2.4.0)
+
+The console can select a virtual *Shared* workspace: no row, no migration, just a
+name for the existing shared scope (rows with a null `assistant_id`). It travels
+as the header value `shared` (`ScopeHeaders.SHARED_VALUE`).
+
+- `SelectedScope` (`ASSISTANT` | `SHARED` | `NONE`) is what the header selects;
+  `AssistantHeader.read(request::getHeader)` (public since 2.4.0) or
+  `SelectedScope.parse(String)` reads it, 400 `INVALID_SCOPE` for anything else.
+  `AssistantHeader.raw` is the value as sent. A controller that still binds the
+  header as `@RequestHeader UUID` answers 400 to `shared`: bind it as a `String`
+  and parse.
+- `@RequestedScope`: the header `shared` lists shared only, like `scope=shared`;
+  the `scope` parameter still wins (`SelectedScope.asListScope()`).
+- `ScopeRules.forCreate(UUID, Boolean, SelectedScope, String)`: the Shared
+  workspace selected makes a new row shared unless the request names an
+  assistant. `ownerForCreate(UUID, Boolean, SelectedScope, String, String)` (rows
+  that are never shared, channels) refuses it with 400 `SCOPE_REQUIRED` "pick an
+  owner workspace" (`ScopeErrors.ownerRequired`), not `SHARED_NOT_ALLOWED`: the
+  caller did not ask for sharing. The `UUID selected` overloads stay and mean
+  `SelectedScope.of(uuid)`; a literal `null` or an untyped Mockito `any()` in that
+  position is now ambiguous, so type it (`(UUID) null`, `any(UUID.class)`).
+- `LegacyAssistantHeaderFilter` copies the value as sent, `shared` included.
+
 ### Names that keep the old product prefix
 
 Data identifiers are not renamed with the code: a rename would sign every user out
@@ -581,6 +606,8 @@ status or readiness.
 | `itways.errors.hide-server-error-messages` | `false` | `true` answers a 5xx `BusinessException` with a fixed text and a reference instead of its message. |
 | `mail.secrets.key`, `mail.secrets.previous-key` | `${MAIL_SECRETS_KEY:}`, `${MAIL_SECRETS_KEY_PREVIOUS:}` | With `@EnableMailSecrets`: the key that seals SEND_MAIL passwords, and the retired one during a rotation. |
 | `itways.mail-secrets.required` | `true` | `false`: a blank key registers no `MailSecrets` bean instead of failing the startup. |
+| `connector.secrets.key`, `connector.secrets.previous-key` | `${CONNECTOR_SECRETS_KEY:}`, `${CONNECTOR_SECRETS_KEY_PREVIOUS:}` | With `@EnableConnectorSecrets` (2.3.0; renamed in 2.5.0): the key that seals the credentials stored on connectors, and the retired one during a rotation. |
+| `itways.connector-secrets.required` | `true` | `false`: a blank key registers no `ConnectorSecrets` bean instead of failing the startup. |
 | `itways.activity.outbox.enabled` | `false` | Records activity events in the outbox table (needs a `DataSource`, a transaction manager and Boot's RabbitMQ auto-configuration). |
 | `itways.activity.outbox.table` | none, required when enabled | The service's outbox table; lower-case identifier. |
 | `itways.activity.outbox.relay-enabled` | `true` | Whether this instance runs the relay (writes happen either way). |
@@ -607,7 +634,11 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   `PiiScrubberTest` (e-mail addresses, phone numbers in ASCII, Arabic-Indic and Eastern
   Arabic-Indic digits, `+`/`00` forms, numbers in Arabic text, what is kept),
   `PassageHashesTest` (values computed by PostgreSQL 16 with the V14 formula),
-  `KnowledgeContractsCompatibilityTest` (the 2.1.0 constructors and the new helpers).
+  `KnowledgeContractsCompatibilityTest` (the 2.1.0 constructors and the new helpers);
+  2.3.0: `HostAllowListTest` (exact, IP-literal and `.domain` entries in every spelling:
+  case, trailing dot, brackets, IDN, IPv6 compression; numeric shorthand, `user@host`,
+  ports and paths never match; entries that are not hosts are refused; the three
+  existing settings keep their meaning).
 - common-web: `SecurityCoreDelegationTest` (the Spring classes delegate to the
   credential rules); `JwtAuthenticationFilterTest` (who gets a session, who gets
   401, who continues unauthenticated); `AccessTokenRevocationTest` (the filter with
@@ -636,7 +667,16 @@ it. The Redis and Ehcache `CacheStore`s are separate and unchanged.
   one-character guess costs as much as a nearly right one on a 1 MB token),
   `ServiceTokenAuthenticationConfigTest` (bean only with a non-blank token, disabled
   registration), `SessionsTest` (service calls), `KnowledgeContractsJsonTest` (2.1.0
-  payloads into the new records and back, the `KnowledgeSource` aliases, round trips).
+  payloads into the new records and back, the `KnowledgeSource` aliases, round trips);
+  2.3.0: `SealedSecretsTest` (format and key id, any text, another context, tampered
+  or truncated values, another prefix, unknown key, rotation and reseal, key and
+  prefix checks, `context`, the three kinds stay apart), `SealedSecretsGoldenVectorsTest`
+  (values sealed by the 2.2.0 `MailSecrets` and `ChannelSecrets`, from the committed
+  fixture `encryption/sealed-secrets-2.2.0.properties`, open with the 2.3.0 classes;
+  same wire format and associated data byte for byte), `ConnectorSecretsTest` (per-row
+  context: moved to another row, field or account it does not open; no legacy plain
+  values), `ConnectorSecretsConfigTest` (the `@EnableConnectorSecrets` wiring, as
+  `MailSecretsConfigTest`, and both beans side by side).
 - common-messaging: `ActivityOutboxTest`, `ActivityOutboxRelayTest`,
   `ActivityOutboxConfigTest` (the outbox's transaction rules, retries and backoff,
   health and gauges, and that it stays off without the property);
@@ -651,14 +691,14 @@ once, a broker outage keeps the rows and sends them after recovery, two relays n
 send one row twice, sent rows go after the retention, and the request id recorded
 with an event arrives as its `x-request-id` header.
 
-Test counts at 2.2.0 (`mvn install -DskipITs`; the ITs are unchanged since 2.1.0):
+Test counts at 2.3.0 (`mvn install`; the ITs are unchanged since 2.1.0):
 
 | Module | Unit tests (surefire) | Integration tests (failsafe) |
 | --- | --- | --- |
-| common-core | 179 (60 at 2.1.0) | none |
-| common-web | 248 (223 at 2.1.0), of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS) | none |
+| common-core | 271 (179 at 2.2.0, 60 at 2.1.0): 2.3.0 adds the 84 of `HostAllowListTest`; the other 8 came with the knowledge-contract additions still in the working tree | none |
+| common-web | 286 (248 at 2.2.0, 223 at 2.1.0), of which the 3 of `DnsRebindingTest` are skipped where `127.0.0.2` is not on the loopback interface (macOS): 2.3.0 adds 32 (`SealedSecretsTest` 12, `SealedSecretsGoldenVectorsTest` 4, `ConnectorSecretsTest` 8, `ConnectorSecretsConfigTest` 8); the other 6 came with the knowledge-contract additions | none |
 | common-messaging | 58 | 10 (`ActivityOutboxIT`) |
 
-495 in all (351 at 2.1.0, 332 at 2.0.0).
+625 in all (495 at 2.2.0, 351 at 2.1.0, 332 at 2.0.0).
 
 A change here is verified against every consumer's own suite before it ships.

@@ -1,11 +1,11 @@
 package com.itways.web.net;
 
+import com.itways.common.net.HostAllowList;
 import com.itways.common.net.PublicUrlPolicy;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.DnsResolver;
@@ -33,9 +33,11 @@ import org.apache.hc.client5.http.DnsResolver;
  * <p>
  * An operator may allow-list hosts the check would refuse (a tenant's system
  * inside the platform's network), as journey-engine's {@code EgressGuard} and
- * notification-service's {@code TenantMailGuard} do: an exact name, or a
- * {@code .domain} suffix that matches the domain and everything under it.
- * An allow-listed host is dialled at whatever it resolves to. What counts as
+ * notification-service's {@code TenantMailGuard} do: an exact name, an IP
+ * literal, or a {@code .domain} suffix that matches the domain and everything
+ * under it; the rule is common-core's {@link HostAllowList} (2.3.0), which
+ * refuses an entry that is not a host when the resolver is built. An
+ * allow-listed host is dialled at whatever it resolves to. What counts as
  * public is a {@link Predicate} too, {@link PublicUrlPolicy#isPublic} by
  * default (ARC-11; moved from conversation-service, where it had no allow-list).
  */
@@ -54,7 +56,7 @@ public final class PublicOnlyDnsResolver implements DnsResolver {
 
     private final PublicUrlPolicy.Resolver lookup;
     private final Predicate<InetAddress> allowed;
-    private final List<String> allowedHosts;
+    private final HostAllowList allowedHosts;
 
     /** System DNS, public addresses only, no allow-list. */
     public PublicOnlyDnsResolver() {
@@ -74,16 +76,17 @@ public final class PublicOnlyDnsResolver implements DnsResolver {
     /**
      * @param lookup       where names are resolved ({@link PublicUrlPolicy#SYSTEM_DNS} in production)
      * @param allowed      what counts as an address that may be dialled
-     * @param allowedHosts hosts dialled without the check: exact names, or {@code .domain}
-     *                     suffixes; case does not matter, blanks are ignored
+     * @param allowedHosts hosts dialled without the check: exact names, IP literals, or
+     *                     {@code .domain} suffixes ({@link HostAllowList}); case does not
+     *                     matter, blanks are ignored
+     * @throws IllegalArgumentException for an entry that is not a host (a URL, a
+     *                                  {@code host:port}, a {@code *.domain})
      */
     public PublicOnlyDnsResolver(PublicUrlPolicy.Resolver lookup, Predicate<InetAddress> allowed,
             Collection<String> allowedHosts) {
         this.lookup = lookup;
         this.allowed = allowed;
-        this.allowedHosts = allowedHosts == null ? List.of()
-                : allowedHosts.stream().filter(h -> h != null && !h.isBlank())
-                        .map(h -> h.trim().toLowerCase(Locale.ROOT)).toList();
+        this.allowedHosts = HostAllowList.of(allowedHosts);
     }
 
     @Override
@@ -115,19 +118,7 @@ public final class PublicOnlyDnsResolver implements DnsResolver {
 
     /** Whether {@code host} is on the allow-list: an exact entry, or under a {@code .domain} entry (the domain itself included). */
     public boolean isAllowedHost(String host) {
-        if (host == null || allowedHosts.isEmpty()) {
-            return false;
-        }
-        String name = unbracket(host.trim()).toLowerCase(Locale.ROOT);
-        if (name.length() > 1 && name.endsWith(".")) {
-            name = name.substring(0, name.length() - 1);
-        }
-        for (String entry : allowedHosts) {
-            if (entry.startsWith(".") ? name.endsWith(entry) || name.equals(entry.substring(1)) : name.equals(entry)) {
-                return true;
-            }
-        }
-        return false;
+        return allowedHosts.allows(host);
     }
 
     /** Whether {@code error}, or anything that caused it, is a host that did not resolve or was refused. */
