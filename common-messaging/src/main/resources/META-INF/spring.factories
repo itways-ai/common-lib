@@ -1,0 +1,4 @@
+# PLT-30: publisher confirms and returns on every service's RabbitMQ connection.
+# See com.itways.messaging.RabbitPublishingDefaults.
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.itways.messaging.RabbitPublishingDefaults

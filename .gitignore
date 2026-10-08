@@ -21,9 +21,3 @@ target/generated-sources/
 
 # OS
 .DS_Store
-
-# Eclipse
-.classpath
-.project
-.settings/
-.factorypath

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.itways</groupId>
+    <artifactId>platform-bom</artifactId>
+    <version>2.5.0</version>
+    <packaging>pom</packaging>
+
+    <name>platform-bom</name>
+    <description>Bill of materials: the one place that says which version of every in-house library the platform's services use</description>
+
+    <!--
+        The platform BOM.
+
+        Every in-house library the services depend on is listed here once, with its
+        version. A service imports this BOM (platform-parent does it for every child)
+        and declares the libraries it needs without a version, so all services move
+        together and no two of them can disagree on a library version.
+
+        Version policy: a library's version is bumped and the library repository is
+        git-tagged on every release; the new version is then written here, and the BOM
+        itself is released (bumped and tagged) with it. Third-party versions are not
+        managed here: they come from Spring Boot, Spring Cloud and the other BOMs that
+        platform-parent imports.
+    -->
+    <properties>
+        <!--
+            The version of common-lib's modules pinned below. Must equal this reactor's
+            version; bump it with every release. Children re-interpolate ${project.version}
+            as their own version, so it must not be used here.
+        -->
+        <platform.version>2.5.0</platform.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- common-lib (this repository): the three modules of the shared library. -->
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-core</artifactId>
+                <version>${platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-web</artifactId>
+                <version>${platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways</groupId>
+                <artifactId>common-messaging</artifactId>
+                <version>${platform.version}</version>
+            </dependency>
+
+            <!-- The other in-house libraries, each released from its own repository. -->
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>ai-engine-sdk</artifactId>
+                <version>1.3.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>file-storage-sdk</artifactId>
+                <version>2.0.2</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>journey-model</artifactId>
+                <version>1.0.20</version>
+            </dependency>
+            <dependency>
+                <groupId>com.itways.assistant</groupId>
+                <artifactId>journey-engine-sdk</artifactId>
+                <version>1.0.20</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!--
+        Only so `mvn spotless:apply` / `mvn spotless:check` run from the reactor root: Maven
+        looks the `spotless` prefix up in every module of the reactor, and this pom has no
+        parent to inherit it from. No Java here, so nothing is formatted. Keep the version
+        equal to platform-parent's spotless.version.
+    -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>2.46.1</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>

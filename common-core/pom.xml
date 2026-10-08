@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.itways</groupId>
+        <artifactId>platform-parent</artifactId>
+        <version>2.5.0</version>
+        <relativePath>../platform-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>common-core</artifactId>
+    <packaging>jar</packaging>
+
+    <name>common-core</name>
+    <description>Framework-free shared code: the credential rules (security.core), the contracts services exchange, the response envelope, error codes and exceptions, the public-URL policy and UTC time handling. No Spring, so a WebFlux application (the api-gateway) can use it.</description>
+
+    <properties>
+        <!-- The version springdoc 2.3.0 brings, so common-web sees one copy. -->
+        <swagger-annotations.version>2.2.19</swagger-annotations.version>
+    </properties>
+
+    <dependencies>
+        <!-- JWT verification (TokenVerifier); the implementation is only needed at runtime. -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- @JsonIgnoreProperties on the contracts; annotations only, no databind. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!--
+            @Schema descriptions on PageResponse and the contracts: the portal's committed
+            OpenAPI specs are generated from them. Compile-time only and optional: the JVM
+            ignores an annotation whose class is absent at runtime, so a consumer without
+            springdoc carries nothing of swagger.
+        -->
+        <dependency>
+            <groupId>io.swagger.core.v3</groupId>
+            <artifactId>swagger-annotations-jakarta</artifactId>
+            <version>${swagger-annotations.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test: JUnit, AssertJ and Mockito only; no Spring, not even here. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- The shared formatter, configured in platform-parent: `mvn spotless:apply` / `mvn spotless:check`. -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
